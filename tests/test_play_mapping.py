@@ -28,3 +28,14 @@ def test_invalid_panel():
     import pytest
     with pytest.raises(ValueError):
         required_fields(Pick3Play("123"), "Z")
+
+def test_existing_panel_a_mapping_names():
+    play = Pick3Play("007", "straight", Decimal("1.00"), "evening")
+    names = [
+        "a.num.col1.0", "a.num.col2.0", "a.num.col3.7",
+        "a.type.str", "a.amount.1-dollar", "a.draw-time.eve",
+    ]
+    points = {name: ScanPoint(0.2, 0.5) for name in names}
+    found, missing = resolve_fields(play, "A", points)
+    assert set(found) == set(names)
+    assert missing == ()
