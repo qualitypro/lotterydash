@@ -50,7 +50,19 @@ class MainWindow(QMainWindow):
             button.clicked.connect(handler)
             actions.addWidget(button)
         layout.addLayout(actions)
+        mapper_button = QPushButton("Open Scan Mapper")
+        mapper_button.clicked.connect(self.open_mapper)
+        layout.addWidget(mapper_button)
+        self.mapper_window = None
         self.setCentralWidget(root)
+
+    def open_mapper(self):
+        from .mapping_ui import MappingWindow
+        if self.mapper_window is None:
+            self.mapper_window = MappingWindow()
+        self.mapper_window.show()
+        self.mapper_window.raise_()
+        self.mapper_window.activateWindow()
 
     def add_panel(self):
         from decimal import Decimal
