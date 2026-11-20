@@ -29,6 +29,8 @@ def main(argv=None):
     parser.add_argument("--y-offset-mm", type=float, default=0.0)
     parser.add_argument("--non-eve-x-mm", type=float, default=0.0)
     parser.add_argument("--non-eve-y-mm", type=float, default=0.0)
+    parser.add_argument("--digit3-x-mm", type=float, default=0.0)
+    parser.add_argument("--amount-x-mm", type=float, default=0.0)
     parser.add_argument("--print", action="store_true", dest="submit")
     args = parser.parse_args(argv)
     if not (len(args.digits) == 3 and args.digits.isdigit()):
@@ -44,7 +46,7 @@ def main(argv=None):
         x_offset_mm=args.x_offset_mm,
         y_offset_mm=args.y_offset_mm,
     )
-    output = write_panel_a_marks(play, args.output, args.mapping, calibration, non_eve_x_mm=args.non_eve_x_mm, non_eve_y_mm=args.non_eve_y_mm)
+    output = write_panel_a_marks(play, args.output, args.mapping, calibration, non_eve_x_mm=args.non_eve_x_mm, non_eve_y_mm=args.non_eve_y_mm, digit3_x_mm=args.digit3_x_mm, amount_x_mm=args.amount_x_mm)
     print(f"Generated: {output.resolve()}")
     print(f"Printer: {PRINTER}; options: {', '.join(OPTIONS)}")
     if not args.submit:
