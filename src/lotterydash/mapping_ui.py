@@ -18,6 +18,7 @@ class ScanCanvas(QWidget):
         super().__init__()
         self.pixmap = QPixmap()
         self.points: dict[str, ScanPoint] = {}
+        self.highlights: set[str] = set()
         self.setMinimumSize(600, 400)
 
     def set_scan(self, path: str):
@@ -37,7 +38,14 @@ class ScanCanvas(QWidget):
             for name, point in self.points.items():
                 x = point.x * self.pixmap.width()
                 y = point.y * self.pixmap.height()
-                painter.drawEllipse(QPointF(x, y), 6, 6)
+                if name in self.highlights:
+                    painter.setPen(QPen(QColor("#e00000"), 3))
+                    painter.setBrush(QColor(255, 0, 0, 160))
+                    painter.drawEllipse(QPointF(x, y), 9, 9)
+                else:
+                    painter.setPen(QPen(QColor("#0066ff"), 2))
+                    painter.setBrush(QColor(0, 102, 255, 90))
+                    painter.drawEllipse(QPointF(x, y), 6, 6)
                 painter.drawText(int(x + 9), int(y - 8), name)
         else:
             painter.drawText(self.rect(), Qt.AlignCenter, "Open the scanned playslip to begin mapping")
@@ -85,6 +93,28 @@ class MappingWindow(QWidget):
         scroll.setWidgetResizable(False)
         layout.addWidget(scroll)
         self.canvas.selected.connect(self.mark_point)
+
+    def open_scan_path(self, filename: str):
+        self.canvas.set_scan(filename)
+        self.scan_path = filename
+        self.points.clear()
+        self.canvas.highlights.clear()
+        self.canvas.points = self.points
+        self.canvas.update()
+        self.status.setText(f"Loaded {Path(filename).name}: {self.canvas.pixmap.width()} x {self.canvas.pixmap.height()} px")
+
+    def load_map_path(self, filename: str):
+        if self.canvas.pixmap.isNull():
+            raise ValueError("Open a scan before loading its mapping")
+        self.points = load_mapping(filename)
+        self.canvas.points = self.points
+        self.canvas.update()
+        self.status.setText(f"Loaded {len(self.points)} marks")
+
+    def show_selections(self, selected: set[str], missing: list[str]):
+        self.canvas.highlights = selected
+        self.canvas.update()
+        self.status.setText(f"Selected: {len(selected)} mapped bubbles; missing: {len(missing)} — " + (", ".join(missing[:5]) if missing else "all mapped"))
 
     def open_scan(self):
         filename, _ = QFileDialog.getOpenFileName(
