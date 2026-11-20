@@ -43,5 +43,5 @@ def test_qt_string_values_are_normalized():
     ("draw", None),
 ])
 def test_invalid_enum_values_have_specific_error(field, value):
-    with pytest.raises(ValueError, match=f"Invalid {field}"):
+    with pytest.raises(ValueError, match=f"Invalid {field.replace('_', ' ')}"):
         Pick3Play("123", **{field: value})
