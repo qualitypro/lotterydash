@@ -28,14 +28,14 @@ class MainWindow(QMainWindow):
         form.addRow("Three digits", self.digits)
         self.play_type = QComboBox()
         for item in PlayType:
-            self.play_type.addItem(item.value.replace("_", " ").title(), item)
+            self.play_type.addItem(item.value.replace("_", " ").title(), item.value)
         form.addRow("Play type", self.play_type)
         self.amount = QComboBox()
         self.amount.addItems(["1.00", "0.50"])
         form.addRow("Wager ($)", self.amount)
         self.draw = QComboBox()
         for item in Draw:
-            self.draw.addItem(item.value.title(), item)
+            self.draw.addItem(item.value.title(), item.value)
         form.addRow("Draw", self.draw)
         layout.addLayout(form)
         self.summary = QLabel("0 / 5 panels")

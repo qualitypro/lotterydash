@@ -31,8 +31,14 @@ class Pick3Play:
             raise ValueError("Pick 3 requires exactly three digits (000-999)")
         if self.amount not in (Decimal("0.50"), Decimal("1.00")):
             raise ValueError("Supported per-play amounts: $0.50 or $1.00")
-        if not isinstance(self.play_type, PlayType) or not isinstance(self.draw, Draw):
-            raise ValueError("Invalid play type or draw")
+        try:
+            object.__setattr__(self, "play_type", PlayType(self.play_type))
+        except (ValueError, TypeError) as exc:
+            raise ValueError(f"Invalid play type: {self.play_type!r}") from exc
+        try:
+            object.__setattr__(self, "draw", Draw(self.draw))
+        except (ValueError, TypeError) as exc:
+            raise ValueError(f"Invalid draw: {self.draw!r}") from exc
 
 MAX_PANELS = 5
 
