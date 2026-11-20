@@ -4,6 +4,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch, mm
 
 from .calibration import load_mapping
+from .slip_geometry import load_corners, scan_to_slip
 from .play_mapping import resolve_fields
 from .print_calibration import PrintCalibration, WIDTH_IN, HEIGHT_IN
 
@@ -15,7 +16,7 @@ LEFT = (LETTER_WIDTH - SLIP_WIDTH) / 2
 BOTTOM = (LETTER_HEIGHT - SLIP_HEIGHT) / 2
 
 def write_letter_panel_a_proof(play, destination, mapping_path, calibration=None):
-    """Place a nominal 4.25 x 9.5-inch slip footprint centered on US Letter.
+    """Place a 3.25 x 8.5-inch slip footprint centered on US Letter.
 
     Positions assume saved normalized coordinates refer to the slip edges.
     If the source scan has margins, correct the scan-to-slip transform before
@@ -25,11 +26,16 @@ def write_letter_panel_a_proof(play, destination, mapping_path, calibration=None
     found, missing = resolve_fields(play, "A", load_mapping(mapping_path))
     if missing:
         raise ValueError("Missing Panel A coordinates: " + ", ".join(missing))
+    corners_path = Path(mapping_path).with_name("pick3-slip-corners.json")
+    if not corners_path.is_file():
+        raise ValueError(f"Four-corner calibration required: {corners_path}")
+    corners = load_corners(corners_path)
     radius = settings.mark_diameter_mm * mm / 2
     marks = []
     for point in found.values():
-        x = LEFT + point.x * SLIP_WIDTH * settings.x_scale + settings.x_offset_mm * mm
-        y = BOTTOM + (1 - point.y) * SLIP_HEIGHT * settings.y_scale + settings.y_offset_mm * mm
+        u, v = scan_to_slip(point, corners)
+        x = LEFT + u * SLIP_WIDTH * settings.x_scale + settings.x_offset_mm * mm
+        y = BOTTOM + (1 - v) * SLIP_HEIGHT * settings.y_scale + settings.y_offset_mm * mm
         if not (radius <= x <= LETTER_WIDTH - radius and radius <= y <= LETTER_HEIGHT - radius):
             raise ValueError("Calibrated mark is outside letter page")
         marks.append((x, y))
