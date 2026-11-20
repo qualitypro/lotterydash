@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 
 from .models import Draw, Pick3Play, PlayType
 from .preview import write_draft_preview
+from .play_mapping import resolve_fields
 
 
 class MainWindow(QMainWindow):
@@ -53,6 +54,9 @@ class MainWindow(QMainWindow):
         mapper_button = QPushButton("Open Scan Mapper")
         mapper_button.clicked.connect(self.open_mapper)
         layout.addWidget(mapper_button)
+        preview_button = QPushButton("Preview plays on scanned slip")
+        preview_button.clicked.connect(self.preview_mapped_plays)
+        layout.addWidget(preview_button)
         self.mapper_window = None
         self.setCentralWidget(root)
 
@@ -63,6 +67,41 @@ class MainWindow(QMainWindow):
         self.mapper_window.show()
         self.mapper_window.raise_()
         self.mapper_window.activateWindow()
+
+    def preview_mapped_plays(self):
+        if not self.plays:
+            QMessageBox.warning(self, "No plays", "Add at least one play in the planner first.")
+            return
+        root = Path(__file__).resolve().parents[2]
+        scan = root / "images" / "pick3-playslip.png"
+        mapping = root / "maps" / "pick3-mapping.json"
+        if not scan.is_file() or not mapping.is_file():
+            QMessageBox.warning(
+                self, "Local assets missing",
+                "Expected images/pick3-playslip.png and maps/pick3-mapping.json "
+                "in the project directory."
+            )
+            return
+        self.open_mapper()
+        try:
+            self.mapper_window.open_scan_path(str(scan))
+            self.mapper_window.load_map_path(str(mapping))
+            selected = set()
+            missing = []
+            for index, play in enumerate(self.plays):
+                found, absent = resolve_fields(play, "ABCDE"[index], self.mapper_window.points)
+                selected.update(found)
+                missing.extend(absent)
+            self.mapper_window.show_selections(selected, missing)
+            if missing:
+                QMessageBox.information(
+                    self, "Incomplete mapping",
+                    f"{len(missing)} required bubble fields have no saved coordinates. "
+                    "The red marks show only mapped selections.\n\n"
+                    + "\n".join(missing[:15])
+                )
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            QMessageBox.critical(self, "Mapping preview failed", str(exc))
 
     def add_panel(self):
         from decimal import Decimal
