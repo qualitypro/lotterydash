@@ -16,7 +16,7 @@ def write_diagnostic(play, destination, mapping_path, crop=(0,0,1,1), mark_mm=3.
     if missing:
         raise ValueError("Missing Panel A coordinates: " + ", ".join(missing))
     width, height = 8.5*inch, 11*inch
-    slip_w, slip_h = 4.25*inch, 9.5*inch
+    slip_w, slip_h = 3.25*inch, 8.5*inch
     sx, sy = (width-slip_w)/2, (height-slip_h)/2
     radius = mark_mm*mm/2
     marks = []
@@ -46,7 +46,7 @@ def write_diagnostic(play, destination, mapping_path, crop=(0,0,1,1), mark_mm=3.
             c.setFont("Helvetica",7)
             c.drawString(bar_x+6*mm,y-2,n.__str__()+" mm")
     c.setFont("Helvetica",7)
-    c.drawString(sx,sy-9*mm,"Slip footprint: 4.25 x 9.5 in; print US Letter at 100%")
+    c.drawString(sx,sy-9*mm,"Slip footprint: 3.25 x 8.5 in; print US Letter at 100%")
     c.setFillColorRGB(0,0,0)
     for x,y in marks:
         c.circle(x,y,radius,stroke=0,fill=1)
