@@ -2,6 +2,7 @@
 import argparse
 from pathlib import Path
 import subprocess
+import re
 
 from reportlab.lib.units import inch, mm
 from reportlab.pdfgen import canvas
@@ -18,10 +19,16 @@ def main(argv=None):
     parser.add_argument("--output", type=Path, default=Path("images/diagnostics/panel-a-all-bubbles.pdf"))
     parser.add_argument("--expected-count", type=int, default=43)
     parser.add_argument("--diameter-mm", type=float, default=3.0)
+    parser.add_argument("--number-grid-y-mm", type=float, default=0.0,
+                        help="Additional Y shift for number-grid bubbles; negative moves toward DRAW TIME")
+    parser.add_argument("--digits-1-to-5-x-mm", type=float, default=0.0,
+                        help="Additional X shift for digit values 1 through 5 in all three columns")
     parser.add_argument("--print", action="store_true", dest="submit")
     args = parser.parse_args(argv)
     if not (0.5 <= args.diameter_mm <= 5.0):
         parser.error("diameter must be between 0.5 and 5.0 mm")
+    if not (-5 <= args.number_grid_y_mm <= 5 and -5 <= args.digits_1_to_5_x_mm <= 5):
+        parser.error("Group corrections must be within +/-5 mm")
     points = load_mapping(args.mapping)
     panel = {key: value for key, value in points.items() if key.lower().startswith("a.")}
     if len(panel) != args.expected_count:
@@ -38,6 +45,13 @@ def main(argv=None):
             y += 1.0 * mm
         if field.lower() in ("a.num.col3.7", "a.digit3.7", "a.amount.1-dollar", "a.amount.1.00"):
             x -= 1.0 * mm
+        number_match = re.fullmatch(r"a\\.num\\.col[123]\\.([0-9])", field.lower())
+        alternate_match = re.fullmatch(r"a\\.digit[123]\\.([0-9])", field.lower())
+        match = number_match or alternate_match
+        if match:
+            y += args.number_grid_y_mm * mm
+            if match.group(1) in "12345":
+                x += args.digits_1_to_5_x_mm * mm
         if not (radius <= x <= width-radius and radius <= y <= height-radius):
             raise ValueError(f"Bubble outside page: {field}")
         marks.append((field, x, y))
@@ -51,6 +65,7 @@ def main(argv=None):
     print(f"Generated: {args.output.resolve()}")
     print(f"Panel A mapped marks: {len(marks)}")
     print("Calibration: +1.5mm X, +1.0mm Y except EVE; digit 3=7 and $1.00 amount each -1.0mm X")
+    print(f"Number-grid Y: {args.number_grid_y_mm:+.2f}mm; digit values 1-5 X: {args.digits_1_to_5_x_mm:+.2f}mm")
     print("WARNING: This is a calibration pattern, NOT a valid lottery entry.")
     if args.submit:
         cmd = ["lp", "-d", PRINTER]
