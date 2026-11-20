@@ -57,7 +57,7 @@ def write_proof(destination,corners):
     found,missing=resolve_fields(Pick3Play("007"),"A",points)
     if missing:raise ValueError("Missing Panel A coordinates: "+", ".join(missing))
     width,height=8.5*inch,11*inch
-    sw,sh=4.25*inch,9.5*inch
+    sw,sh=3.25*inch,8.5*inch
     left,bottom=(width-sw)/2,(height-sh)/2
     transformed=[]
     for key,p in found.items():
