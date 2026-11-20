@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 
 from .models import Draw, Pick3Play, PlayType
 from .preview import write_draft_preview
+from .mapped_preview import write_mapped_preview
 from .play_mapping import resolve_fields
 
 
@@ -46,6 +47,7 @@ class MainWindow(QMainWindow):
             ("Add panel", self.add_panel),
             ("Clear", self.clear),
             ("Export draft PDF", self.export),
+            ("Export mapped PDF proof", self.export_mapped),
         ]:
             button = QPushButton(name)
             button.clicked.connect(handler)
@@ -122,6 +124,29 @@ class MainWindow(QMainWindow):
     def clear(self):
         self.plays.clear()
         self.summary.setText("0 / 5 panels")
+
+    def export_mapped(self):
+        if not self.plays:
+            QMessageBox.warning(self, "No plays", "Add at least one play first.")
+            return
+        from PySide6.QtWidgets import QFileDialog
+        root = Path(__file__).resolve().parents[2]
+        scan = root / "images" / "pick3-playslip.png"
+        mapping = root / "maps" / "pick3-mapping.json"
+        filename, _ = QFileDialog.getSaveFileName(
+            self, "Save scan-aligned PDF proof",
+            str(Path(gettempdir()) / "lotterydash-mapped-proof.pdf"),
+            "PDF files (*.pdf)"
+        )
+        if filename:
+            try:
+                write_mapped_preview(self.plays, filename, scan, mapping)
+                QMessageBox.information(
+                    self, "PDF proof saved",
+                    f"Saved: {filename}\\nVisual proof only — NOT calibrated for printing."
+                )
+            except (OSError, ValueError, TypeError, KeyError) as exc:
+                QMessageBox.critical(self, "Mapped export failed", str(exc))
 
     def export(self):
         if not self.plays:
