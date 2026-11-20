@@ -41,10 +41,12 @@ def save_calibration(path, calibration):
 def load_calibration(path):
     return PrintCalibration(**json.loads(Path(path).read_text(encoding="utf-8")))
 
-def write_panel_a_marks(play, destination, mapping_path, calibration=None, non_eve_x_mm=0.0, non_eve_y_mm=0.0):
+def write_panel_a_marks(play, destination, mapping_path, calibration=None, non_eve_x_mm=0.0, non_eve_y_mm=0.0, digit3_x_mm=0.0, amount_x_mm=0.0):
     """Optional offsets affect all selected marks except the evening draw bubble."""
     if not (-20 <= non_eve_x_mm <= 20 and -20 <= non_eve_y_mm <= 20):
         raise ValueError("Selective offsets must be within ±20 mm")
+    if not (-20 <= digit3_x_mm <= 20 and -20 <= amount_x_mm <= 20):
+        raise ValueError("Per-bubble offsets must be within ±20 mm")
     calibration = calibration or PrintCalibration()
     points = load_mapping(mapping_path)
     found, missing = resolve_fields(play, "A", points)
@@ -68,6 +70,10 @@ def write_panel_a_marks(play, destination, mapping_path, calibration=None, non_e
         if field.lower() not in ("a.draw-time.eve", "a.evening"):
             x += non_eve_x_mm * mm
             y += non_eve_y_mm * mm
+        if field.lower() in ("a.num.col3.7", "a.digit3.7"):
+            x += digit3_x_mm * mm
+        if field.lower() in ("a.amount.1-dollar", "a.amount.1.00"):
+            x += amount_x_mm * mm
         if not (radius <= x <= width - radius and radius <= y <= height - radius):
             raise ValueError("A mark falls outside the page; adjust calibration")
         pdf.circle(x, y, radius, stroke=0, fill=1)
