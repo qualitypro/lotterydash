@@ -9,9 +9,10 @@ from reportlab.lib.units import inch, mm
 
 from .calibration import load_mapping
 from .play_mapping import resolve_fields
+from .slip_geometry import load_corners, scan_to_slip
 
-WIDTH_IN = 4.25
-HEIGHT_IN = 9.5
+WIDTH_IN = 3.25
+HEIGHT_IN = 8.5
 
 @dataclass(frozen=True)
 class PrintCalibration:
@@ -52,10 +53,15 @@ def write_panel_a_marks(play, destination, mapping_path, calibration=None):
     pdf = canvas.Canvas(str(target), pagesize=(width, height))
     pdf.setTitle("LotteryDash Panel A marks-only calibration - NOT VERIFIED FOR PRINTING")
     pdf.setFillColorRGB(0, 0, 0)
+    corners_path = Path(mapping_path).with_name("pick3-slip-corners.json")
+    if not corners_path.is_file():
+        raise ValueError(f"Four-corner calibration required: {corners_path}")
+    corners = load_corners(corners_path)
     radius = calibration.mark_diameter_mm * mm / 2
     for point in found.values():
-        x = point.x * width * calibration.x_scale + calibration.x_offset_mm * mm
-        y = (1 - point.y) * height * calibration.y_scale + calibration.y_offset_mm * mm
+        u, v = scan_to_slip(point, corners)
+        x = u * width * calibration.x_scale + calibration.x_offset_mm * mm
+        y = (1 - v) * height * calibration.y_scale + calibration.y_offset_mm * mm
         if not (radius <= x <= width - radius and radius <= y <= height - radius):
             raise ValueError("A mark falls outside the page; adjust calibration")
         pdf.circle(x, y, radius, stroke=0, fill=1)
