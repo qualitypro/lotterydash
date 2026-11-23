@@ -130,7 +130,15 @@ class FivePanelEditor(QWidget):
 
     def collect_plays(self):
         plays = []
+        gap = False
         for panel in self.panels:
+            if not panel.enabled.isChecked():
+                gap = True
+                continue
+            if gap:
+                raise ValueError(
+                    "Panels must be filled in order from A through E. "
+                    "Clear later panels or fill the earlier empty panel.")
             try:
                 play = panel.get_play()
             except ValueError as exc:
