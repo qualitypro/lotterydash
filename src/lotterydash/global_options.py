@@ -7,6 +7,7 @@ GLOBAL_FIELDS = (
     "global.fireball",
     "global.quick-picks.10-dollar",
     "global.quick-picks.5-dollar",
+    *(f"global.days.{day}" for day in range(2, 15)),
 )
 
 
@@ -26,11 +27,11 @@ def mapping_summary(points):
             panel_counts[prefix] += 1
     globals_present = [name for name in GLOBAL_FIELDS if name in points]
     return {
-        "expected_fields": 218,
+        "expected_fields": 231,
         "mapped_fields": len(points),
         "panel_counts": panel_counts,
         "global_mapped": globals_present,
         "global_missing": [name for name in GLOBAL_FIELDS if name not in points],
         "complete": all(count == 43 for count in panel_counts.values())
-                    and len(globals_present) == 3 and len(points) == 218,
+                    and len(globals_present) == len(GLOBAL_FIELDS) and len(points) == 231,
     }
