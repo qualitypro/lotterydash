@@ -217,6 +217,9 @@ def main(argv=None):
             target = args.output_dir / ("automap-approved.json" if approved else "automap-draft.json")
             try:
                 target = safe_destination(self.source, target)
+                meta = target.with_suffix(".review.json")
+                if meta.exists():
+                    raise FileExistsError(f"Refusing to overwrite review metadata: {meta}")
                 output = {}
                 for name, marker in self.markers.items():
                     pos = marker.pos()
