@@ -4,7 +4,7 @@ from lotterydash.global_options import GLOBAL_FIELDS, mapping_summary, validate_
 
 
 def test_global_ids_are_unique():
-    assert len(GLOBAL_FIELDS) == len(set(GLOBAL_FIELDS)) == 3
+    assert len(GLOBAL_FIELDS) == len(set(GLOBAL_FIELDS)) == 16
 
 
 def test_incomplete_global_mapping_rejected():
@@ -16,7 +16,7 @@ def test_all_global_fields_accepted():
     assert validate_global_fields(dict.fromkeys(GLOBAL_FIELDS))
 
 
-def test_complete_mapping_requires_218():
+def test_complete_mapping_requires_231():
     fields = {
         f"{panel}.num.{i}": None
         for panel in "abcde" for i in range(43)
@@ -25,5 +25,11 @@ def test_complete_mapping_requires_218():
     fields.update(dict.fromkeys(GLOBAL_FIELDS))
     summary = mapping_summary(fields)
     assert summary["complete"]
-    assert summary["mapped_fields"] == 218
+    assert summary["mapped_fields"] == 231
     assert summary["global_missing"] == []
+
+
+def test_days_cover_exactly_2_through_14():
+    assert [f for f in GLOBAL_FIELDS if f.startswith("global.days.")] == [
+        f"global.days.{n}" for n in range(2, 15)
+    ]
