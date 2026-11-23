@@ -8,7 +8,7 @@ def test_global_ids_are_unique():
 
 
 def test_incomplete_global_mapping_rejected():
-    with pytest.raises(ValueError, match="global.quick-picks.no"):
+    with pytest.raises(ValueError, match="global.quick-picks.5-dollar"):
         validate_global_fields(dict.fromkeys(GLOBAL_FIELDS[:2]))
 
 
