@@ -5,8 +5,8 @@ image-based review and explicit placement until a verified detector exists.
 """
 GLOBAL_FIELDS = (
     "global.fireball",
-    "global.quick-picks.yes",
-    "global.quick-picks.no",
+    "global.quick-picks.10-dollar",
+    "global.quick-picks.5-dollar",
 )
 
 
