@@ -188,11 +188,16 @@ class MainWindow(LegacyMainWindow):
         from .app_title_bar import AppTitleBar, WindowEdgeController
         self.app_title_bar = AppTitleBar(self)
         self.window_edge_controller = WindowEdgeController(self)
-        outer.addWidget(self.app_title_bar)
+        from PySide6.QtWidgets import QFrame
+        chrome = QFrame(container)
+        chrome.setObjectName("applicationChrome")
+        chrome_layout = QVBoxLayout(chrome)
+        chrome_layout.setContentsMargins(0, 0, 0, 0)
+        chrome_layout.setSpacing(0)
+        chrome_layout.addWidget(self.app_title_bar)
         from .workspace_menus import create_workspace_menus
         self.workspace_menus = create_workspace_menus(self)
-        outer.addWidget(self.workspace_menus)
-        from PySide6.QtWidgets import QFrame
+        chrome_layout.addWidget(self.workspace_menus)
         header = QFrame()
         header.setObjectName("workspaceHeader")
         header_layout = QVBoxLayout(header)
@@ -248,7 +253,8 @@ class MainWindow(LegacyMainWindow):
         self.context_label.setMinimumWidth(100)
         bar.addWidget(self.context_label)
         header_layout.addLayout(bar)
-        outer.addWidget(header)
+        chrome_layout.addWidget(header)
+        outer.addWidget(chrome)
         self.game_notice = QLabel()
         self.game_notice.setWordWrap(False)
         self.game_notice.setObjectName("gameNotice")
@@ -258,7 +264,13 @@ class MainWindow(LegacyMainWindow):
         self.tabs.setObjectName("workspaceTabs")
         self.tabs.setDocumentMode(True)
         self.tabs.currentChanged.connect(self._update_toolbar_context)
-        outer.addWidget(self.tabs)
+        workspace_panel = QFrame(container)
+        workspace_panel.setObjectName("applicationWorkspacePanel")
+        workspace_layout = QVBoxLayout(workspace_panel)
+        workspace_layout.setContentsMargins(2, 2, 2, 2)
+        workspace_layout.setSpacing(0)
+        workspace_layout.addWidget(self.tabs)
+        outer.addWidget(workspace_panel, 1)
         from .five_panel_editor import FivePanelEditor
         self.panel_editor = FivePanelEditor()
         self.tabs.addTab(self.panel_editor, "Play")
@@ -652,6 +664,11 @@ def main():
     app.setStyleSheet("""
         QMainWindow { background: #eef2f7; color: #17283d; }
         QWidget { color: #17283d; font-family: "Noto Sans", "DejaVu Sans", sans-serif; font-size: 12px; }
+        QFrame#applicationChrome { background: #101f32; border: 1px solid #304968; border-radius: 7px; }
+        QFrame#applicationWorkspacePanel { background: #ffffff; border: 1px solid #cbd8e7; border-radius: 7px; }
+        QMenuBar#workspaceMenuBar { background: #e8eef6; color: #20344d; padding: 2px 8px; border-top: 1px solid #304968; border-bottom: 1px solid #c7d4e3; }
+        QMenuBar#workspaceMenuBar::item { background: transparent; padding: 4px 12px; border-radius: 4px; }
+        QMenuBar#workspaceMenuBar::item:selected { background: #cbdff5; color: #123b64; }
         QWidget#appTitleBar { background: #101f32; border-radius: 5px; }\n        QLabel#windowDragHint { color: #a6bbd2; font-size: 10px; padding-left: 10px; }\n        QLabel#appWindowTitle { color: #f3f7fd; font-weight: 700; font-size: 12px; }\n        QToolButton#windowControl, QToolButton#windowCloseButton { background: #2c4563; color: #ffffff; border: 1px solid #68819e; border-radius: 5px; font-size: 18px; font-weight: 700; }\n        QToolButton#windowControl:hover { background: #34506d; }\n        QToolButton#windowCloseButton { background: #a83240; border-color: #d66a74; }\n        QToolButton#windowCloseButton:hover { background: #dc4653; color: white; }\n        QLabel#toolbarContext { color: #bcd5f2; font-size: 11px; }\n        QToolButton#headerAction { background: #2a4565; color: #f0f6ff; border: 1px solid #54718f; border-radius: 4px; padding: 3px 8px; }\n        QToolButton#headerAction:hover { background: #365b80; }\n        QFrame#workspaceHeader { background: #172d49; border: 1px solid #284565; border-radius: 6px; }
         QFrame#workspaceHeader QLabel { color: #f4f8ff; }
         QLabel#brandEyebrow { color: #9bc8fa; font-size: 10px; font-weight: 700; }
