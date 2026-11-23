@@ -36,3 +36,12 @@ def test_production_requires_explicit_review(tmp_path):
 def test_unsupported_game_production_blocked(tmp_path):
     with pytest.raises(ValueError, match="not implemented"):
         validate_for_game("powerball", tmp_path / "missing.json")
+
+def test_new_project_persists_and_reopens(tmp_path):
+    project = new_project("Pick 4 Test", "pick4")
+    destination = tmp_path / project_filename(project["name"])
+    save_project(destination, project)
+    reopened = load_project(destination)
+    assert reopened["name"] == "Pick 4 Test"
+    assert reopened["game"] == "pick4"
+    assert reopened["mapping_approved"] is False
