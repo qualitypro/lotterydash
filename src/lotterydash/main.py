@@ -254,6 +254,12 @@ class MainWindow(LegacyMainWindow):
         bar.addWidget(self.context_label)
         header_layout.addLayout(bar)
         chrome_layout.addWidget(header)
+        self.project_context_container = QFrame(chrome)
+        self.project_context_container.setObjectName('projectContextContainer')
+        self.project_context_layout = QVBoxLayout(self.project_context_container)
+        self.project_context_layout.setContentsMargins(6, 2, 6, 2)
+        self.project_context_layout.setSpacing(2)
+        chrome_layout.addWidget(self.project_context_container)
         outer.addWidget(chrome)
         self.game_notice = QLabel()
         self.game_notice.setWordWrap(False)
@@ -329,9 +335,12 @@ class MainWindow(LegacyMainWindow):
         self.setCentralWidget(container)
         from .context_inspector import install_context_inspector
         install_context_inspector(self)
+        self.project_context_container.setVisible(self.context_inspector.isVisible())
         self.context_help_menu_action.setChecked(self.context_inspector.isVisible())
         self.context_inspector.visibilityChanged.connect(
             self.context_help_menu_action.setChecked)
+        self.context_inspector.visibilityChanged.connect(
+            self.project_context_container.setVisible)
         self._game_changed()
         self._update_toolbar_context()
 
@@ -667,6 +676,8 @@ def main():
     app.setStyleSheet("""
         QMainWindow { background: #eef2f7; color: #17283d; }
         QWidget { color: #17283d; font-family: "Noto Sans", "DejaVu Sans", sans-serif; font-size: 12px; }
+        QFrame#projectContextContainer { background: #f0f5fb; border-top: 1px solid #cbd8e7; }
+        QWidget#projectContextHelp { background: #f0f5fb; color: #17283d; }
         QFrame#applicationChrome { background: #101f32; border: 1px solid #304968; border-radius: 7px; }
         QFrame#applicationWorkspacePanel { background: #ffffff; border: 1px solid #cbd8e7; border-radius: 7px; }
         QMenuBar#workspaceMenuBar { background: #e8eef6; color: #20344d; padding: 2px 8px; border-top: 1px solid #304968; border-bottom: 1px solid #c7d4e3; }
