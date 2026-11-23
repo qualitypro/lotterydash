@@ -246,6 +246,11 @@ class MainWindow(LegacyMainWindow):
             index = self.tabs.addTab(page, title)
             from .help_tooltips import HELP
             self.tabs.setTabToolTip(index, HELP.get(title, title))
+        from .element_guide import ElementGuide
+        self.element_guide = ElementGuide()
+        guide_index = self.tabs.addTab(self.element_guide, "Element Guide")
+        self.tabs.setTabToolTip(
+            guide_index, "Search the meanings of game terms, playslip controls, mapping, projects and printing.")
         self.setCentralWidget(container)
         self._game_changed()
 
