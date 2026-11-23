@@ -41,3 +41,19 @@ def test_active_panel_roundtrip(app):
     panel.enabled.setChecked(True)
     panel.digits.setText("123")
     assert editor.collect_plays()[0].digits == "123"
+
+
+def test_panel_readiness_states(app):
+    editor = FivePanelEditor()
+    panel = editor.panels[0]
+    assert panel.status.text() == "VOID"
+    assert editor.progress.value() == 0
+    panel.enabled.setChecked(True)
+    assert panel.status.text() == "INCOMPLETE"
+    assert editor.progress.value() == 0
+    panel.digits.setText("007")
+    assert panel.status.text() == "READY"
+    assert editor.progress.value() == 1
+    panel.enabled.setChecked(False)
+    assert panel.status.text() == "VOID"
+    assert editor.progress.value() == 0
