@@ -204,6 +204,11 @@ class MainWindow(LegacyMainWindow):
                 self.game_selector.setItemData(self.game_selector.count() - 1, group, 3)
         self.game_selector.setMinimumWidth(145)
         self.game_selector.setToolTip("Select one of the ten Florida Lottery draw games. Pick 3 has the complete editor; other games have project setup only.")
+        from PySide6.QtCore import QSettings
+        self._game_settings = QSettings("LotteryDash", "LotteryDash")
+        last_game = self._game_settings.value("workspace/last_game", "pick3", type=str)
+        restored_index = self.game_selector.findData(last_game)
+        self.game_selector.setCurrentIndex(restored_index if restored_index >= 0 else self.game_selector.findData("pick3"))
         self.game_selector.currentIndexChanged.connect(self._game_changed)
         bar.addWidget(self.game_selector)
         self.project_title = QLabel("No project selected")
@@ -295,6 +300,7 @@ class MainWindow(LegacyMainWindow):
         from .projects import GAMES
         game = self.game_selector.currentData()
         supported = game == "pick3"
+        self._game_settings.setValue("workspace/last_game", game)
         self.tabs.setTabEnabled(0, supported)
         self.game_notice.setText("Pick 3 · Editor ready" if supported else f"{GAMES[game]} · Project setup only")
         if not supported and self.tabs.currentIndex() == 0:
