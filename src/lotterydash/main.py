@@ -172,7 +172,7 @@ class MainWindow(LegacyMainWindow):
     def __init__(self):
         from PySide6.QtWidgets import QTabWidget, QGroupBox
         super().__init__()
-        from .projects import GAMES
+        from .projects import GAMES, GAME_GROUPS
         self.setWindowTitle("LotteryDash | Project Workspace")
         self.resize(1050, 740)
         self.project = None
@@ -182,10 +182,16 @@ class MainWindow(LegacyMainWindow):
         container = QWidget()
         outer = QVBoxLayout(container)
         bar = QHBoxLayout()
-        bar.addWidget(QLabel("Game"))
+        game_label = QLabel("FLORIDA LOTTERY GAME")
+        game_label.setObjectName("sectionTitle")
+        bar.addWidget(game_label)
         self.game_selector = QComboBox()
-        for code, title in GAMES.items():
-            self.game_selector.addItem(title, code)
+        for group, codes in GAME_GROUPS.items():
+            for code in codes:
+                self.game_selector.addItem(GAMES[code], code)
+                self.game_selector.setItemData(self.game_selector.count() - 1, group, 3)
+        self.game_selector.setMinimumWidth(185)
+        self.game_selector.setToolTip("Select one of the ten Florida Lottery draw games. Pick 3 has the complete editor; other games have project setup only.")
         self.game_selector.currentIndexChanged.connect(self._game_changed)
         bar.addWidget(self.game_selector)
         self.project_title = QLabel("No project selected")
@@ -200,6 +206,10 @@ class MainWindow(LegacyMainWindow):
             button.clicked.connect(callback)
             bar.addWidget(button)
         outer.addLayout(bar)
+        self.game_notice = QLabel()
+        self.game_notice.setWordWrap(True)
+        self.game_notice.setObjectName("mutedLabel")
+        outer.addWidget(self.game_notice)
         self.tabs = QTabWidget()
         outer.addWidget(self.tabs)
         from .five_panel_editor import FivePanelEditor
@@ -208,6 +218,7 @@ class MainWindow(LegacyMainWindow):
         self.tabs.setTabToolTip(0, "Edit Pick 3 numbers, play types, wagers, draw times, and Fireball for panels A–E.")
         old_planner.deleteLater()
         self.project_status = QLabel("Create or open a project to begin.")
+        self.game_workflow_buttons = []
         for title, description in (
             ("Playslip", "Preview current play selections against this project's scanned slip."),
             ("Mapping Studio", "Edit a draft, review the 231 fields, and publish a versioned mapping."),
@@ -220,6 +231,7 @@ class MainWindow(LegacyMainWindow):
             if title == "Playslip":
                 button = QPushButton("Preview mapped selections")
                 button.clicked.connect(self.preview_mapped_plays)
+                self.game_workflow_buttons.append(button)
                 column.addWidget(button)
             elif title == "Mapping Studio":
                 self.mapping_status = QLabel("No mapping selected")
@@ -232,13 +244,17 @@ class MainWindow(LegacyMainWindow):
                 ):
                     button = QPushButton(label)
                     button.clicked.connect(callback)
+                    if label in ("Edit mapping", "Publish reviewed mapping"):
+                        self.game_workflow_buttons.append(button)
                     column.addWidget(button)
             elif title == "Print / Proof":
                 button = QPushButton("Export draft PDF")
                 button.clicked.connect(self.export)
+                self.game_workflow_buttons.append(button)
                 column.addWidget(button)
                 button = QPushButton("Export mapped PDF proof")
                 button.clicked.connect(self.export_mapped)
+                self.game_workflow_buttons.append(button)
                 column.addWidget(button)
             elif title == "Settings":
                 column.addWidget(self.project_status)
@@ -259,12 +275,25 @@ class MainWindow(LegacyMainWindow):
     def _game_changed(self, *_):
         from .projects import GAMES
         game = self.game_selector.currentData()
-        self.tabs.setTabEnabled(0, game == "pick3")
-        if game != "pick3" and self.tabs.currentIndex() == 0:
+        supported = game == "pick3"
+        self.tabs.setTabEnabled(0, supported)
+        self.game_notice.setText(
+            "Pick 3 editor ready — configure panels, mapping and PDF proofs."
+            if supported else
+            f"{GAMES[game]} selected — project setup available. "
+            "Game-specific play entry, mapping and PDF proofs are not implemented yet."
+        )
+        if not supported and self.tabs.currentIndex() == 0:
             self.tabs.setCurrentIndex(1)
         self.project_title.setText(
             (self.project["name"] if self.project else "Unsaved project") +
             " | " + GAMES[game])
+        if hasattr(self, "game_workflow_buttons"):
+            for button in self.game_workflow_buttons:
+                button.setEnabled(supported)
+                button.setToolTip(
+                    "Available for Pick 3 only until this game's workflow is implemented."
+                    if not supported else "")
         self._refresh_project_status()
 
     def _refresh_project_status(self):
@@ -347,6 +376,9 @@ class MainWindow(LegacyMainWindow):
         self.plays = []
 
     def export(self):
+        if self.game_selector.currentData() != "pick3":
+            QMessageBox.information(self, "Coming later", "PDF export is currently available for Pick 3 only.")
+            return
         try:
             self._sync_panel_plays()
         except ValueError as exc:
@@ -355,6 +387,9 @@ class MainWindow(LegacyMainWindow):
         super().export()
 
     def export_mapped(self):
+        if self.game_selector.currentData() != "pick3":
+            QMessageBox.information(self, "Coming later", "Mapped proofs are currently available for Pick 3 only.")
+            return
         try:
             self._sync_panel_plays()
         except ValueError as exc:
@@ -363,6 +398,9 @@ class MainWindow(LegacyMainWindow):
         super().export_mapped()
 
     def preview_mapped_plays(self):
+        if self.game_selector.currentData() != "pick3":
+            QMessageBox.information(self, "Coming later", "Mapped previews are currently available for Pick 3 only.")
+            return
         try:
             self._sync_panel_plays()
         except ValueError as exc:
