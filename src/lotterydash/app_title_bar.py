@@ -1,6 +1,75 @@
-"""Application-owned title bar with native compositor move and window controls."""
-from PySide6.QtCore import Qt, QPoint
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QToolButton, QStyle
+"""Application-owned title bar and compositor-native edge resizing."""
+from PySide6.QtCore import Qt, QObject, QEvent
+from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QToolButton, QApplication
+
+
+class WindowEdgeController(QObject):
+    """Start native resize on all eight edges/corners, including Wayland."""
+
+    MARGIN = 9
+
+    def __init__(self, host):
+        super().__init__(host)
+        self.host = host
+        self._cursor_widget = None
+        QApplication.instance().installEventFilter(self)
+
+    def _edges(self, point):
+        rect = self.host.rect()
+        m = self.MARGIN
+        edges = Qt.Edge(0)
+        if point.x() < m:
+            edges |= Qt.Edge.LeftEdge
+        elif point.x() >= rect.width() - m:
+            edges |= Qt.Edge.RightEdge
+        if point.y() < m:
+            edges |= Qt.Edge.TopEdge
+        elif point.y() >= rect.height() - m:
+            edges |= Qt.Edge.BottomEdge
+        return edges
+
+    @staticmethod
+    def _shape(edges):
+        horizontal = bool(edges & (Qt.Edge.LeftEdge | Qt.Edge.RightEdge))
+        vertical = bool(edges & (Qt.Edge.TopEdge | Qt.Edge.BottomEdge))
+        if horizontal and vertical:
+            same = bool(edges & Qt.Edge.LeftEdge) == bool(edges & Qt.Edge.TopEdge)
+            return Qt.CursorShape.SizeFDiagCursor if same else Qt.CursorShape.SizeBDiagCursor
+        if horizontal:
+            return Qt.CursorShape.SizeHorCursor
+        if vertical:
+            return Qt.CursorShape.SizeVerCursor
+        return None
+
+    def _clear_cursor(self):
+        if self._cursor_widget is not None:
+            self._cursor_widget.unsetCursor()
+            self._cursor_widget = None
+
+    def eventFilter(self, watched, event):
+        if not isinstance(watched, QWidget) or watched.window() is not self.host:
+            return False
+        if self.host.isMaximized() or self.host.isFullScreen():
+            self._clear_cursor()
+            return False
+        if event.type() not in (QEvent.Type.MouseMove, QEvent.Type.MouseButtonPress):
+            return False
+        point = self.host.mapFromGlobal(event.globalPosition().toPoint())
+        edges = self._edges(point)
+        if event.type() == QEvent.Type.MouseMove:
+            if self._cursor_widget is not watched:
+                self._clear_cursor()
+            shape = self._shape(edges)
+            if shape is not None:
+                watched.setCursor(shape)
+                self._cursor_widget = watched
+            elif self._cursor_widget is watched:
+                self._clear_cursor()
+        elif edges and event.button() == Qt.MouseButton.LeftButton:
+            handle = self.host.windowHandle()
+            if handle is not None and handle.startSystemResize(edges):
+                return True
+        return False
 
 
 class AppTitleBar(QWidget):
@@ -8,17 +77,20 @@ class AppTitleBar(QWidget):
         super().__init__(window)
         self.host = window
         self.setObjectName("appTitleBar")
-        self.setFixedHeight(32)
+        self.setFixedHeight(39)
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(9, 2, 5, 2)
-        layout.setSpacing(4)
+        layout.setContentsMargins(12, 3, 7, 3)
+        layout.setSpacing(5)
         self.title = QLabel("◆  LotteryDash")
         self.title.setObjectName("appWindowTitle")
         layout.addWidget(self.title)
+        self.drag_hint = QLabel("Drag to move  ·  Edges to resize")
+        self.drag_hint.setObjectName("windowDragHint")
+        layout.addWidget(self.drag_hint)
         layout.addStretch()
-        self.minimize_button = self._button("−", "Minimize", window.showMinimized)
-        self.maximize_button = self._button("□", "Maximize / Restore", self.toggle_maximize)
-        self.close_button = self._button("×", "Close", window.close)
+        self.minimize_button = self._button("—", "Minimize window", window.showMinimized)
+        self.maximize_button = self._button("□", "Maximize or restore window", self.toggle_maximize)
+        self.close_button = self._button("×", "Close LotteryDash", window.close)
         self.close_button.setObjectName("windowCloseButton")
         self._drag_position = None
 
@@ -27,7 +99,7 @@ class AppTitleBar(QWidget):
         button.setText(symbol)
         button.setToolTip(tooltip)
         button.setObjectName("windowControl")
-        button.setFixedSize(32, 25)
+        button.setFixedSize(43, 31)
         button.clicked.connect(callback)
         self.layout().addWidget(button)
         return button
@@ -41,6 +113,7 @@ class AppTitleBar(QWidget):
 
     def refresh_state(self):
         self.maximize_button.setText("❐" if self.host.isMaximized() else "□")
+        self.maximize_button.setToolTip("Restore window" if self.host.isMaximized() else "Maximize window")
 
     def mouseDoubleClickEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
