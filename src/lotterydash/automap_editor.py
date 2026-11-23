@@ -36,6 +36,7 @@ def main(argv=None):
     parser.add_argument("--image", type=Path, required=True)
     parser.add_argument("--mapping", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, default=Path("images/diagnostics/automap-editor"))
+    parser.add_argument("--panel-mapping", type=Path, default=Path("maps/pick3-mapping.json"))
     parser.add_argument("--resume-latest", action="store_true",
                         help="Offer to reopen the latest complete 231-field draft")
     args = parser.parse_args(argv)
@@ -177,6 +178,10 @@ def main(argv=None):
             for field in GLOBAL_FIELDS:
                 self.global_choice.addItem(field, field)
             controls.addWidget(self.global_choice)
+            detect_button = QPushButton("Detect All Fields (231)")
+            detect_button.setToolTip("Create a separate proposal; never overwrites the current draft")
+            detect_button.clicked.connect(self.detect_all_fields)
+            controls.addWidget(detect_button)
             place_button = QPushButton("Place selected global field")
             place_button.clicked.connect(self.start_global_placement)
             controls.addWidget(place_button)
@@ -231,6 +236,70 @@ def main(argv=None):
             self.resize(1200, 850)
             self.fit_slip()
             self.statusBar().showMessage(f"{len(self.markers)} fields loaded — review required")
+
+        def detect_all_fields(self):
+            """Run unified detection and open its separate review proposal."""
+            from datetime import datetime
+            from .unified_automap import run as run_unified
+            from .global_options import mapping_summary
+            from PySide6.QtGui import QDesktopServices
+            from PySide6.QtCore import QUrl
+
+            if self.snapshot() != self.saved_snapshot:
+                QMessageBox.warning(
+                    self, "Unsaved changes",
+                    "Save your current edits to a new draft before running detection.")
+                return
+            if not mapping_summary(self.points)["complete"]:
+                QMessageBox.warning(
+                    self, "Reference incomplete",
+                    "Load a complete 231-field draft before running Detect All Fields.")
+                return
+            response = QMessageBox.question(
+                self, "Detect all 231 fields",
+                "Run automatic detection against this scan? A new review-only "
+                "proposal will be created. The current mapping will not change.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes)
+            if response != QMessageBox.StandardButton.Yes:
+                return
+            destination = args.output_dir / (
+                "detect-all-" + datetime.now().strftime("%Y%m%d-%H%M%S-%f"))
+            self.statusBar().showMessage("Detecting 231 fields — please wait")
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+            try:
+                report = run_unified(
+                    args.image, args.panel_mapping, self.source, destination)
+            except Exception as exc:
+                QMessageBox.critical(self, "Detection failed", str(exc))
+                return
+            finally:
+                QApplication.restoreOverrideCursor()
+            if not report["complete_detection"]:
+                QMessageBox.warning(
+                    self, "Detection needs review",
+                    "Some fields could not be confirmed. Review the reports at:\\n"
+                    + str(destination))
+                return
+            proposed = destination / "automap-231-proposed.json"
+            reply = QMessageBox.question(
+                self, "Detection complete — review required",
+                "231 candidates detected. Open the proposal in a NEW editor "
+                "window for manual inspection?\\n" + str(proposed),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes)
+            if reply == QMessageBox.StandardButton.Yes:
+                import subprocess
+                import sys
+                subprocess.Popen([
+                    sys.executable, "-m", "lotterydash.automap_editor",
+                    "--image", str(args.image),
+                    "--mapping", str(proposed),
+                    "--panel-mapping", str(args.panel_mapping),
+                    "--output-dir", str(destination / "editor-review"),
+                ])
+            self.statusBar().showMessage(
+                "231-field proposal created — not approved; visual review required")
 
         def snapshot(self):
             return {name: (marker.pos().x(), marker.pos().y())
