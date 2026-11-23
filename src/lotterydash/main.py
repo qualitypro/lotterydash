@@ -181,13 +181,13 @@ class MainWindow(LegacyMainWindow):
         old_planner = self.takeCentralWidget()
         container = QWidget()
         outer = QVBoxLayout(container)
-        outer.setContentsMargins(7, 6, 7, 6)
-        outer.setSpacing(4)
+        outer.setContentsMargins(5, 3, 5, 3)
+        outer.setSpacing(2)
         from PySide6.QtWidgets import QFrame
         header = QFrame()
         header.setObjectName("workspaceHeader")
         header_layout = QVBoxLayout(header)
-        header_layout.setContentsMargins(10, 5, 10, 5)
+        header_layout.setContentsMargins(5, 2, 5, 2)
         header_layout.setSpacing(0)
         brand = QLabel("LOTTERYDASH  /  FLORIDA LOTTERY")
         brand.setObjectName("brandEyebrow")
@@ -213,26 +213,34 @@ class MainWindow(LegacyMainWindow):
         bar.addWidget(self.game_selector)
         self.project_title = QLabel("No project selected")
         self.project_title.setObjectName("projectTitle")
-        self.project_title.setMaximumWidth(260)
+        self.project_title.setMaximumWidth(220)
         bar.addWidget(self.project_title, 1)
+        from PySide6.QtWidgets import QMenu, QToolButton
+        project_button = QToolButton()
+        project_button.setText("Project ▾")
+        project_button.setObjectName("headerAction")
+        project_button.setToolTip("Create, open, configure and save LotteryDash projects.")
+        project_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        project_menu = QMenu(project_button)
         for label, callback in (
-            ("New", self.new_project_dialog),
-            ("Open", self.open_project_dialog),
-            ("Setup", self.edit_game_setup),
-            ("Save", self.save_project_dialog),
-            ("Save As", lambda: self.save_project_dialog(True)),
+            ("New Project…", self.new_project_dialog),
+            ("Open Project…", self.open_project_dialog),
+            ("Game Setup…", self.edit_game_setup),
+            ("Save Project", self.save_project_dialog),
+            ("Save Project As…", lambda: self.save_project_dialog(True)),
         ):
-            button = QPushButton(label)
-            button.setObjectName("primaryButton" if label == "New" else "headerAction")
-            button.clicked.connect(callback)
-            bar.addWidget(button)
+            action = project_menu.addAction(label)
+            action.triggered.connect(lambda checked=False, fn=callback: fn())
+        project_button.setMenu(project_menu)
+        self.project_menu_button = project_button
+        bar.addWidget(project_button)
         header_layout.addLayout(bar)
         outer.addWidget(header)
         self.game_notice = QLabel()
         self.game_notice.setWordWrap(False)
         self.game_notice.setObjectName("gameNotice")
         self.game_notice.setToolTip("The selected game determines which workflows are available.")
-        outer.addWidget(self.game_notice)
+        self.game_notice.hide()
         self.tabs = QTabWidget()
         self.tabs.setObjectName("workspaceTabs")
         self.tabs.setDocumentMode(True)
