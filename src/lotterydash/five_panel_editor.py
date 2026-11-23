@@ -130,9 +130,9 @@ class PanelEditor(QWidget):
             self.draw.currentIndexChanged,
         ):
             signal.connect(self.changed)
-        self._panel_toggled(False)
+        self._panel_toggled(False, notify=False)
 
-    def _panel_toggled(self, active):
+    def _panel_toggled(self, active, notify=True):
         """Unchecked is a void panel: erase selections and lock its inputs."""
         if not active:
             for widget in (self.digits, self.play_type, self.amount, self.draw, self.fireball):
@@ -150,7 +150,8 @@ class PanelEditor(QWidget):
                     widget.blockSignals(previous)
         for widget in (self.digits, self.play_type, self.amount, self.draw, self.fireball):
             widget.setEnabled(active)
-        self.changed()
+        if notify:
+            self.changed()
 
     def _update_play_help(self, *_):
         self.play_type.setToolTip(PLAY_HELP.get(self.play_type.currentData(), "Select the play type."))
