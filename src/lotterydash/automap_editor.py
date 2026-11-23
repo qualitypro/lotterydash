@@ -35,13 +35,13 @@ def main(argv=None):
     parser.add_argument("--mapping", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, default=Path("images/diagnostics/automap-editor"))
     args = parser.parse_args(argv)
-    from PySide6.QtCore import Qt, QPointF, QRectF, Signal
+    from PySide6.QtCore import Qt, QPointF, QRectF
     from PySide6.QtGui import QColor, QBrush, QPen, QPixmap, QPainter, QUndoCommand, QUndoStack
     from PySide6.QtWidgets import (
-        QApplication, QGraphicsEllipseItem, QGraphicsPixmapItem,
+        QApplication, QGraphicsEllipseItem,
         QGraphicsScene, QGraphicsView, QHBoxLayout, QVBoxLayout,
         QMainWindow, QWidget, QLabel, QPushButton, QComboBox,
-        QMessageBox, QSplitter, QFormLayout, QDoubleSpinBox
+        QMessageBox, QSplitter, QFormLayout, QDoubleSpinBox, QSlider
     )
 
     class Marker(QGraphicsEllipseItem):
@@ -56,6 +56,7 @@ def main(argv=None):
             self.setFlag(self.GraphicsItemFlag.ItemIsSelectable)
             self.setFlag(self.GraphicsItemFlag.ItemSendsGeometryChanges)
             self.setZValue(10)
+            self.setFlag(self.GraphicsItemFlag.ItemIgnoresTransformations, True)
             self.setToolTip(name)
             self._start = QPointF(x, y)
 
@@ -90,6 +91,7 @@ def main(argv=None):
             super().__init__()
             self.editor = editor
             self.setDragMode(self.DragMode.ScrollHandDrag)
+            self.setBackgroundBrush(QColor(34, 38, 42))
             self.setRenderHint(QPainter.RenderHint.Antialiasing, True)
             self.setTransformationAnchor(self.ViewportAnchor.AnchorUnderMouse)
 
@@ -117,10 +119,13 @@ def main(argv=None):
             self.view = Canvas(self)
             self.view.setScene(self.scene)
             self.scene.setSceneRect(QRectF(self.image.rect()))
+            self.slip_bounds = self.calculate_slip_bounds()
             self.panel = QComboBox()
             self.panel.addItems(["All", "A", "B", "C", "D", "E"])
             self.panel.currentTextChanged.connect(self.filter_panel)
             self.field_label = QLabel("Select a marker")
+            self.field_details = QLabel("Panel: — | Type: — | Value: —")
+            self.field_details.setWordWrap(True)
             self.field_label.setWordWrap(True)
             self.x_spin = QDoubleSpinBox()
             self.y_spin = QDoubleSpinBox()
@@ -142,6 +147,22 @@ def main(argv=None):
             controls.addWidget(QLabel("Visible panel"))
             controls.addWidget(self.panel)
             controls.addWidget(self.field_label)
+            controls.addWidget(self.field_details)
+            nav = QHBoxLayout()
+            for label, callback in (("Fit Slip", self.fit_slip),
+                                    ("Fit Panel", self.fit_panel),
+                                    ("+", lambda: self.view.scale(1.25, 1.25)),
+                                    ("−", lambda: self.view.scale(.8, .8))):
+                button = QPushButton(label)
+                button.clicked.connect(callback)
+                nav.addWidget(button)
+            controls.addLayout(nav)
+            controls.addWidget(QLabel("Marker size"))
+            self.marker_size = QSlider(Qt.Orientation.Horizontal)
+            self.marker_size.setRange(3, 14)
+            self.marker_size.setValue(5)
+            self.marker_size.valueChanged.connect(self.set_marker_size)
+            controls.addWidget(self.marker_size)
             form = QFormLayout()
             form.addRow("X (normalized)", self.x_spin)
             form.addRow("Y (normalized)", self.y_spin)
@@ -165,10 +186,49 @@ def main(argv=None):
             splitter.addWidget(side)
             splitter.setStretchFactor(0, 5)
             splitter.setStretchFactor(1, 1)
+            side.setMaximumWidth(340)
             self.setCentralWidget(splitter)
             self.resize(1200, 850)
-            self.view.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
+            self.fit_slip()
             self.statusBar().showMessage(f"{len(self.markers)} fields loaded — review required")
+
+        def calculate_slip_bounds(self):
+            """Derive a generous scan crop from known field centers, no image edits."""
+            positions = list(self.original.values())
+            if not positions:
+                return QRectF(self.image.rect())
+            xs = [p.x() for p in positions]
+            ys = [p.y() for p in positions]
+            # The printed logo/instructions extend beyond the selection fields.
+            margin_x = max(100, (max(xs) - min(xs)) * .65)
+            margin_y = max(90, (max(ys) - min(ys)) * .17)
+            left = max(0, min(xs) - margin_x)
+            top = max(0, min(ys) - margin_y)
+            right = min(self.width_px, max(xs) + margin_x)
+            bottom = min(self.height_px, max(ys) + margin_y)
+            return QRectF(left, top, right - left, bottom - top)
+
+        def fit_slip(self):
+            self.view.fitInView(self.slip_bounds, Qt.AspectRatioMode.KeepAspectRatio)
+
+        def fit_panel(self):
+            panel = self.panel.currentText()
+            if panel == "All":
+                self.fit_slip()
+                return
+            positions = [m.pos() for name, m in self.markers.items()
+                         if name.lower().startswith(panel.lower() + ".")]
+            if positions:
+                xs = [p.x() for p in positions]
+                ys = [p.y() for p in positions]
+                rect = QRectF(min(xs) - 55, min(ys) - 45,
+                              max(xs) - min(xs) + 110,
+                              max(ys) - min(ys) + 90)
+                self.view.fitInView(rect, Qt.AspectRatioMode.KeepAspectRatio)
+
+        def set_marker_size(self, size):
+            for marker in self.markers.values():
+                marker.setRect(-size, -size, size * 2, size * 2)
 
         def filter_panel(self, value):
             for name, marker in self.markers.items():
@@ -177,6 +237,17 @@ def main(argv=None):
         def select_field(self, name):
             self.active = name
             self.field_label.setText(name)
+            parts = name.split(".")
+            panel = parts[0].upper() if parts else "?"
+            category = parts[1] if len(parts) > 1 else "unknown"
+            value = ".".join(parts[2:]) if len(parts) > 2 else "unknown"
+            self.field_details.setText(
+                f"Panel: {panel} | Type: {category} | Value: {value}")
+            for key, marker in self.markers.items():
+                selected = key == name
+                marker.setPen(QPen(QColor("#ffd43b" if selected else "#006437"),
+                                   3 if selected else 1.5))
+                marker.setZValue(20 if selected else 10)
             self.update_coordinates()
 
         def update_coordinates(self):
