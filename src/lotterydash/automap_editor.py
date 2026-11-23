@@ -46,7 +46,7 @@ def main(argv=None):
         QApplication, QGraphicsEllipseItem,
         QGraphicsScene, QGraphicsView, QHBoxLayout, QVBoxLayout,
         QMainWindow, QWidget, QLabel, QPushButton, QComboBox,
-        QMessageBox, QSplitter, QFormLayout, QDoubleSpinBox, QSlider
+        QMessageBox, QSplitter, QFormLayout, QDoubleSpinBox, QSlider, QCheckBox
     )
 
     class Marker(QGraphicsEllipseItem):
@@ -122,7 +122,7 @@ def main(argv=None):
                 if latest is not None and latest.resolve() != self.source.resolve():
                     choice = QMessageBox.question(
                         self, "Resume saved AutoMap draft",
-                        f"Resume the latest complete 231-field draft?\\n{latest}",
+                        f"Resume the latest complete 231-field draft?\n{latest}",
                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                         QMessageBox.StandardButton.Yes)
                     if choice == QMessageBox.StandardButton.Yes:
@@ -178,6 +178,15 @@ def main(argv=None):
             for field in GLOBAL_FIELDS:
                 self.global_choice.addItem(field, field)
             controls.addWidget(self.global_choice)
+            controls.addWidget(QLabel("Review checklist (not automatic approval)"))
+            self.review_checks = {}
+            for section in ("A", "B", "C", "D", "E", "Global"):
+                check = QCheckBox(f"{section} visually inspected")
+                check.stateChanged.connect(self.refresh_review_status)
+                self.review_checks[section] = check
+                controls.addWidget(check)
+            self.review_status = QLabel("Reviewed sections: 0/6")
+            controls.addWidget(self.review_status)
             detect_button = QPushButton("Detect All Fields (231)")
             detect_button.setToolTip("Create a separate proposal; never overwrites the current draft")
             detect_button.clicked.connect(self.detect_all_fields)
@@ -237,13 +246,15 @@ def main(argv=None):
             self.fit_slip()
             self.statusBar().showMessage(f"{len(self.markers)} fields loaded — review required")
 
+        def refresh_review_status(self, *_):
+            reviewed = sum(check.isChecked() for check in self.review_checks.values())
+            self.review_status.setText(f"Reviewed sections: {reviewed}/6")
+
         def detect_all_fields(self):
             """Run unified detection and open its separate review proposal."""
             from datetime import datetime
             from .unified_automap import run as run_unified
             from .global_options import mapping_summary
-            from PySide6.QtGui import QDesktopServices
-            from PySide6.QtCore import QUrl
 
             if self.snapshot() != self.saved_snapshot:
                 QMessageBox.warning(
@@ -267,6 +278,7 @@ def main(argv=None):
                 "detect-all-" + datetime.now().strftime("%Y%m%d-%H%M%S-%f"))
             self.statusBar().showMessage("Detecting 231 fields — please wait")
             QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+            QApplication.processEvents()
             try:
                 report = run_unified(
                     args.image, args.panel_mapping, self.source, destination)
@@ -278,14 +290,14 @@ def main(argv=None):
             if not report["complete_detection"]:
                 QMessageBox.warning(
                     self, "Detection needs review",
-                    "Some fields could not be confirmed. Review the reports at:\\n"
+                    "Some fields could not be confirmed. Review the reports at:\n"
                     + str(destination))
                 return
             proposed = destination / "automap-231-proposed.json"
             reply = QMessageBox.question(
                 self, "Detection complete — review required",
                 "231 candidates detected. Open the proposal in a NEW editor "
-                "window for manual inspection?\\n" + str(proposed),
+                "window for manual inspection?\n" + str(proposed),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.Yes)
             if reply == QMessageBox.StandardButton.Yes:
@@ -474,6 +486,9 @@ def main(argv=None):
                 if meta.exists():
                     raise FileExistsError(f"Refusing to overwrite review metadata: {meta}")
                 if approved:
+                    if not all(check.isChecked() for check in self.review_checks.values()):
+                        raise ValueError(
+                            "Review all six sections (A–E and Global) before approval")
                     validate_global_fields(self.markers)
                     if len(self.markers) != 231:
                         raise ValueError(f"Expected exactly 231 fields; found {len(self.markers)}")
@@ -491,6 +506,11 @@ def main(argv=None):
                     "approved": approved, "source": str(self.source),
                     "field_count": len(output),
                     "review_method": "manual_editor",
+                    "reviewed_sections": [
+                        section for section, check in self.review_checks.items()
+                        if check.isChecked()
+                    ],
+                    "detection_is_not_print_calibration": True,
                 }, indent=2) + "\n", encoding="utf-8")
                 self.saved_snapshot = self.snapshot()
                 QMessageBox.information(self, "Saved", str(target))
@@ -501,6 +521,11 @@ def main(argv=None):
             self.export(False)
 
         def approve(self):
+            if not all(check.isChecked() for check in self.review_checks.values()):
+                QMessageBox.warning(
+                    self, "Review incomplete",
+                    "Check all six visually inspected sections before approval.")
+                return
             response = QMessageBox.question(
                 self, "Approve mapping",
                 "Have you inspected all five panels, Fireball, Quick Picks $10/$5, and Days 2–14? This creates a separate "
