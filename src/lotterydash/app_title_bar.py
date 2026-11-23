@@ -1,6 +1,6 @@
 """Application-owned title bar and compositor-native edge resizing."""
 from PySide6.QtCore import Qt, QObject, QEvent
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QToolButton, QApplication
+from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QToolButton, QApplication, QFrame
 
 
 class WindowEdgeController(QObject):
@@ -77,7 +77,7 @@ class AppTitleBar(QWidget):
         super().__init__(window)
         self.host = window
         self.setObjectName("appTitleBar")
-        self.setFixedHeight(39)
+        self.setFixedHeight(42)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(12, 3, 7, 3)
         layout.setSpacing(5)
@@ -85,15 +85,22 @@ class AppTitleBar(QWidget):
         self.title.setObjectName("appWindowTitle")
         self.title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         layout.addWidget(self.title)
-        self.drag_hint = QLabel("Drag to move  ·  Edges to resize")
+        self.drag_hint = QLabel("Project Workspace")
         self.drag_hint.setObjectName("windowDragHint")
         self.drag_hint.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         layout.addWidget(self.drag_hint)
         layout.addStretch()
+        self.window_controls = QFrame(self)
+        self.window_controls.setObjectName("windowControlsPanel")
+        controls_layout = QHBoxLayout(self.window_controls)
+        controls_layout.setContentsMargins(2, 1, 2, 1)
+        controls_layout.setSpacing(3)
+        self._controls_layout = controls_layout
         self.minimize_button = self._button("−", "Minimize window", window.showMinimized)
         self.maximize_button = self._button("□", "Maximize or restore window", self.toggle_maximize)
         self.close_button = self._button("×", "Close LotteryDash", window.close)
         self.close_button.setObjectName("windowCloseButton")
+        layout.addWidget(self.window_controls, 0, Qt.AlignmentFlag.AlignRight)
         self._drag_position = None
 
     def _button(self, symbol, tooltip, callback):
@@ -103,7 +110,7 @@ class AppTitleBar(QWidget):
         button.setObjectName("windowControl")
         button.setFixedSize(43, 31)
         button.clicked.connect(callback)
-        self.layout().addWidget(button)
+        self._controls_layout.addWidget(button)
         return button
 
     def toggle_maximize(self):
