@@ -2,7 +2,7 @@
 from html import escape
 from PySide6.QtCore import QObject, QEvent, Qt, QSettings
 from PySide6.QtWidgets import (
-    QApplication, QDockWidget, QWidget, QVBoxLayout, QHBoxLayout,
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QTextBrowser, QCheckBox, QPushButton, QComboBox, QTabBar, QToolButton,
     QAbstractButton, QLineEdit,
 )
@@ -11,17 +11,15 @@ from .element_guide import ENTRIES
 DEFINITIONS = {name.casefold(): (name, group, meaning) for name, group, meaning in ENTRIES}
 
 
-class ContextInspector(QDockWidget):
-    """A dock that remains visible while switching workspace tabs."""
+class ContextInspector(QWidget):
+    """Collapsible context-help widget embedded below the project header."""
 
     def __init__(self, parent):
-        super().__init__("Context Help", parent)
+        super().__init__(parent)
         self.setObjectName("lotterydashContextInspector")
         self.settings = QSettings("LotteryDash", "LotteryDash")
-        self.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea |
-                             Qt.DockWidgetArea.RightDockWidgetArea)
-        body = QWidget()
-        layout = QVBoxLayout(body)
+        self.setObjectName("projectContextHelp")
+        layout = QVBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
         header = QHBoxLayout()
         self.pin = QCheckBox("Pin")
@@ -40,7 +38,6 @@ class ContextInspector(QDockWidget):
         self.detail = QTextBrowser()
         self.detail.setOpenExternalLinks(False)
         self._add_section(layout, "explanation", "Explanation", self.detail, 1)
-        self.setWidget(body)
         self._last = None
         self.pin.setChecked(self.settings.value("context_help/pinned", False, type=bool))
         self.pin.toggled.connect(lambda value: self.settings.setValue("context_help/pinned", value))
@@ -180,9 +177,7 @@ class ContextTracker(QObject):
 
 def install_context_inspector(window):
     dock = ContextInspector(window)
-    window.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
-    dock.setMinimumWidth(200)
-    dock.resize(230, 450)
+    window.project_context_layout.addWidget(dock)
     settings = QSettings("LotteryDash", "LotteryDash")
     dock.setVisible(settings.value("context_help/visible", True, type=bool))
     dock.visibilityChanged.connect(
