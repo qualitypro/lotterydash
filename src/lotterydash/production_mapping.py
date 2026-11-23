@@ -20,8 +20,8 @@ _SAFE_ID = re.compile(r"^[a-zA-Z0-9_-]{1,80}$")
 
 
 def validate_for_game(game: str, mapping: Path) -> dict:
-    points = load_mapping(mapping)
     if game == "pick3":
+        points = load_mapping(mapping)
         summary = mapping_summary(points)
         if not summary["complete"]:
             raise ValueError("Pick 3 production mapping requires all 231 fields")
