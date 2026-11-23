@@ -37,6 +37,8 @@ class ContextInspector(QWidget):
         self._add_section(layout, "location", "Context location", self.path)
         self.detail = QTextBrowser()
         self.detail.setOpenExternalLinks(False)
+        self.detail.setMaximumHeight(165)
+        self.detail.setMinimumHeight(80)
         self._add_section(layout, "explanation", "Explanation", self.detail, 1)
         self._last = None
         self.pin.setChecked(self.settings.value("context_help/pinned", False, type=bool))
@@ -180,7 +182,7 @@ def install_context_inspector(window):
     window.project_context_layout.addWidget(dock)
     settings = QSettings("LotteryDash", "LotteryDash")
     dock.setVisible(settings.value("context_help/visible", True, type=bool))
-    dock.visibilityChanged.connect(
+    window.context_help_menu_action.triggered.connect(
         lambda visible: settings.setValue("context_help/visible", visible))
     tracker = ContextTracker(window, dock)
     QApplication.instance().installEventFilter(tracker)
