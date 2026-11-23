@@ -68,8 +68,8 @@ class PanelEditor(QWidget):
         self.letter = letter
         self.changed = changed
         row = QHBoxLayout(self)
-        row.setContentsMargins(4, 2, 4, 2)
-        row.setSpacing(5)
+        row.setContentsMargins(3, 1, 3, 1)
+        row.setSpacing(4)
         self.enabled = QCheckBox(letter)
         self.enabled.setToolTip("Check panel " + letter + " to activate it. Unchecked panels are void: their values are cleared and they are excluded from saving and printing.")
         self.enabled.setFixedWidth(40)
@@ -121,7 +121,6 @@ class PanelEditor(QWidget):
         reset.setFixedWidth(49)
         reset.setToolTip("Clear panel " + letter)
         reset.clicked.connect(self.reset)
-        reset.setToolTip("Clear panel " + letter)
         row.addWidget(reset)
         self.status = QLabel("VOID")
         self.status.setFixedWidth(77)
@@ -204,8 +203,8 @@ class FivePanelEditor(QWidget):
         super().__init__(parent)
         self.on_change = on_change
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(5, 4, 5, 4)
-        layout.setSpacing(3)
+        layout.setContentsMargins(4, 3, 4, 3)
+        layout.setSpacing(2)
         heading = QHBoxLayout()
         title = QLabel("Pick 3  /  Playslip")
         title.setObjectName("sectionTitle")
@@ -214,17 +213,23 @@ class FivePanelEditor(QWidget):
         self.summary = QLabel("0 of 5 panels")
         self.summary.setObjectName("mutedLabel")
         heading.addWidget(self.summary)
+        self.guide_toggle = QPushButton("Guide ▸")
+        self.guide_toggle.setObjectName("subtleButton")
+        self.guide_toggle.setCheckable(True)
+        self.guide_toggle.setChecked(False)
+        self.guide_toggle.setToolTip("Expand or collapse the detailed play explanation.")
+        heading.addWidget(self.guide_toggle)
         layout.addLayout(heading)
 
         sheet = QFrame()
         sheet.setObjectName("panelSheet")
         grid = QVBoxLayout(sheet)
-        grid.setContentsMargins(3, 2, 3, 2)
+        grid.setContentsMargins(2, 1, 2, 1)
         grid.setSpacing(0)
         headers = QWidget()
         labels = QHBoxLayout(headers)
-        labels.setContentsMargins(2, 0, 2, 1)
-        labels.setSpacing(5)
+        labels.setContentsMargins(1, 0, 1, 0)
+        labels.setSpacing(4)
         explanations = {
             "Panel": "Check A–E to activate that playslip position. Unchecked panels are void, cleared, and omitted from saving and proofs.",
             "Numbers": "Three digits for the selected panel, including leading zeros such as 007.",
@@ -264,11 +269,6 @@ class FivePanelEditor(QWidget):
         guide_layout = QVBoxLayout(self.guide)
         guide_layout.setContentsMargins(7, 4, 7, 4)
         guide_layout.setSpacing(1)
-        self.guide_toggle = QPushButton("Show play guide ▸")
-        self.guide_toggle.setCheckable(True)
-        self.guide_toggle.setChecked(False)
-        self.guide_toggle.setToolTip("Expand or collapse the detailed play explanation.")
-        layout.addWidget(self.guide_toggle)
         self.guide_title = QLabel("Visual play guide")
         self.guide_title.setObjectName("columnHeader")
         self.guide_example = QLabel()
@@ -305,7 +305,7 @@ class FivePanelEditor(QWidget):
 
     def _toggle_guide(self, expanded):
         self.guide.setVisible(expanded)
-        self.guide_toggle.setText("Hide play guide ▾" if expanded else "Show play guide ▸")
+        self.guide_toggle.setText("Guide ▾" if expanded else "Guide ▸")
 
     def show_guide(self, panel):
         self._guide_panel = panel
