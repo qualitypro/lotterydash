@@ -1,9 +1,9 @@
 """Persistent, nested context explanations for LotteryDash controls."""
 from html import escape
-from PySide6.QtCore import QObject, QEvent, Qt
+from PySide6.QtCore import QObject, QEvent, Qt, QSettings
 from PySide6.QtWidgets import (
     QApplication, QDockWidget, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QTextBrowser, QCheckBox, QPushButton, QComboBox, QTabBar,
+    QLabel, QTextBrowser, QCheckBox, QPushButton, QComboBox, QTabBar, QToolButton,
     QAbstractButton, QLineEdit,
 )
 from .element_guide import ENTRIES
@@ -17,6 +17,7 @@ class ContextInspector(QDockWidget):
     def __init__(self, parent):
         super().__init__("Context Help", parent)
         self.setObjectName("lotterydashContextInspector")
+        self.settings = QSettings("LotteryDash", "LotteryDash")
         self.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea |
                              Qt.DockWidgetArea.RightDockWidgetArea)
         body = QWidget()
@@ -35,16 +36,36 @@ class ContextInspector(QDockWidget):
         self.path = QLabel("Workspace → Context Help")
         self.path.setWordWrap(True)
         self.path.setObjectName("mutedLabel")
-        layout.addWidget(self.path)
+        self._add_section(layout, "location", "Context location", self.path)
         self.detail = QTextBrowser()
         self.detail.setOpenExternalLinks(False)
-        layout.addWidget(self.detail, 1)
+        self._add_section(layout, "explanation", "Explanation", self.detail, 1)
         self.setWidget(body)
         self._last = None
-        self.reset()
+        self.pin.setChecked(self.settings.value("context_help/pinned", False, type=bool))
+        self.pin.toggled.connect(lambda value: self.settings.setValue("context_help/pinned", value))
+        self.reset(clear_pin=False)
 
-    def reset(self):
-        self.pin.setChecked(False)
+    def _add_section(self, layout, key, title, widget, stretch=0):
+        toggle = QToolButton(self)
+        toggle.setText(title)
+        toggle.setCheckable(True)
+        toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        toggle.setAutoRaise(True)
+        expanded = self.settings.value(f"context_help/expanded/{key}", True, type=bool)
+        toggle.setChecked(expanded)
+        def changed(value):
+            widget.setVisible(value)
+            toggle.setArrowType(Qt.ArrowType.DownArrow if value else Qt.ArrowType.RightArrow)
+            self.settings.setValue(f"context_help/expanded/{key}", value)
+        toggle.toggled.connect(changed)
+        changed(expanded)
+        layout.addWidget(toggle)
+        layout.addWidget(widget, stretch)
+
+    def reset(self, clear_pin=True):
+        if clear_pin:
+            self.pin.setChecked(False)
         self._last = None
         self.path.setText("Workspace → Context Help")
         self.detail.setHtml(
@@ -162,6 +183,10 @@ def install_context_inspector(window):
     window.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
     dock.setMinimumWidth(200)
     dock.resize(230, 450)
+    settings = QSettings("LotteryDash", "LotteryDash")
+    dock.setVisible(settings.value("context_help/visible", True, type=bool))
+    dock.visibilityChanged.connect(
+        lambda visible: settings.setValue("context_help/visible", visible))
     tracker = ContextTracker(window, dock)
     QApplication.instance().installEventFilter(tracker)
     window._context_tracker = tracker
