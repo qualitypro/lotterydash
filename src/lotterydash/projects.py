@@ -6,7 +6,25 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-GAMES = {"pick3": "Pick 3", "pick4": "Pick 4", "powerball": "Powerball"}
+# Stable identifiers are persisted in project JSON; never rename existing keys.
+GAMES = {
+    "pick2": "Pick 2",
+    "pick3": "Pick 3",
+    "pick4": "Pick 4",
+    "pick5": "Pick 5",
+    "fantasy5": "Fantasy 5",
+    "cashpop": "Cash Pop",
+    "floridalotto": "Florida Lotto",
+    "jackpottripleplay": "Jackpot Triple Play",
+    "powerball": "Powerball",
+    "megamillions": "Mega Millions",
+}
+GAME_GROUPS = {
+    "Pick Games": ("pick2", "pick3", "pick4", "pick5"),
+    "Daily & Florida Draw Games": ("fantasy5", "cashpop", "floridalotto", "jackpottripleplay"),
+    "Multi-State Draw Games": ("powerball", "megamillions"),
+}
+IMPLEMENTED_EDITORS = frozenset({"pick3"})
 SCHEMA_VERSION = 1
 
 
