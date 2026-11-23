@@ -71,7 +71,7 @@ class PanelEditor(QWidget):
         row.setContentsMargins(7, 5, 7, 5)
         row.setSpacing(8)
         self.enabled = QCheckBox(letter)
-        self.enabled.setToolTip("Include panel " + letter + " in the saved playslip and PDF proof.")
+        self.enabled.setToolTip("Check panel " + letter + " to activate it. Unchecked panels are void: their values are cleared and they are excluded from saving and printing.")
         self.enabled.setFixedWidth(47)
         row.addWidget(self.enabled)
         self.digits = QLineEdit()
@@ -123,37 +123,52 @@ class PanelEditor(QWidget):
         reset.clicked.connect(self.reset)
         row.addWidget(reset)
         self.digits.textChanged.connect(self._digits_changed)
+        self.enabled.toggled.connect(self._panel_toggled)
         for signal in (
-            self.enabled.toggled, self.fireball.toggled,
+            self.fireball.toggled,
             self.play_type.currentIndexChanged, self.amount.currentIndexChanged,
             self.draw.currentIndexChanged,
         ):
             signal.connect(self.changed)
+        self._panel_toggled(False)
+
+    def _panel_toggled(self, active):
+        """Unchecked is a void panel: erase selections and lock its inputs."""
+        if not active:
+            for widget in (self.digits, self.play_type, self.amount, self.draw, self.fireball):
+                previous = widget.blockSignals(True)
+                try:
+                    if widget is self.digits:
+                        widget.clear()
+                    elif widget is self.fireball:
+                        widget.setChecked(False)
+                    elif widget is self.draw:
+                        widget.setCurrentIndex(1)
+                    else:
+                        widget.setCurrentIndex(0)
+                finally:
+                    widget.blockSignals(previous)
+        for widget in (self.digits, self.play_type, self.amount, self.draw, self.fireball):
+            widget.setEnabled(active)
+        self.changed()
 
     def _update_play_help(self, *_):
         self.play_type.setToolTip(PLAY_HELP.get(self.play_type.currentData(), "Select the play type."))
 
     def _digits_changed(self, text):
-        if text and not self.enabled.isChecked():
-            self.enabled.setChecked(True)
         self.changed()
 
     def reset(self):
         self.enabled.setChecked(False)
-        self.digits.clear()
-        self.play_type.setCurrentIndex(0)
-        self.amount.setCurrentIndex(0)
-        self.draw.setCurrentIndex(1)
-        self.fireball.setChecked(False)
-        self.changed()
+        self._panel_toggled(False)
 
     def load_play(self, play):
+        self.enabled.setChecked(True)
         self.digits.setText(play.digits)
         self.play_type.setCurrentIndex(self.play_type.findData(play.play_type.value))
         self.amount.setCurrentIndex(self.amount.findData(str(play.amount)))
         self.draw.setCurrentIndex(self.draw.findData(play.draw.value))
         self.fireball.setChecked(play.fireball)
-        self.enabled.setChecked(True)
 
     def get_play(self):
         if not self.enabled.isChecked():
@@ -192,7 +207,7 @@ class FivePanelEditor(QWidget):
         labels.setContentsMargins(7, 0, 7, 5)
         labels.setSpacing(8)
         explanations = {
-            "Panel": "Panels A–E correspond to the five play positions on the physical playslip. Check a letter to include it.",
+            "Panel": "Check A–E to activate that playslip position. Unchecked panels are void, cleared, and omitted from saving and proofs.",
             "Numbers": "Three digits for the selected panel, including leading zeros such as 007.",
             "Play type": "Straight requires exact order; Box allows any order; Straight/Box combines both; Combo covers arrangements; Front/Back Pair use two digits. Hover over the selector for the chosen type.",
             "Wager": "Choose a $0.50 or $1.00 base wager. Combo and Fireball can increase total ticket cost.",
@@ -252,7 +267,7 @@ class FivePanelEditor(QWidget):
         self._guide_panel = self.panels[0]
         self.show_guide(self._guide_panel)
         footer = QHBoxLayout()
-        hint = QLabel("Enter three digits per row; filled rows are enabled automatically.")
+        hint = QLabel("Check a panel to activate it; unchecked panels are void and cleared.")
         hint.setObjectName("mutedLabel")
         footer.addWidget(hint, 1)
         clear = QPushButton("Clear all")
