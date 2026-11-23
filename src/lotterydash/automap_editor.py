@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 
 from .calibration import ScanPoint, load_mapping, save_mapping
+from .global_options import GLOBAL_FIELDS, validate_global_fields
 
 
 def safe_destination(source: Path, destination: Path):
@@ -95,6 +96,14 @@ def main(argv=None):
             self.setRenderHint(QPainter.RenderHint.Antialiasing, True)
             self.setTransformationAnchor(self.ViewportAnchor.AnchorUnderMouse)
 
+        def mousePressEvent(self, event):
+            if self.editor.placement_field is not None and event.button() == Qt.MouseButton.LeftButton:
+                point = self.mapToScene(event.position().toPoint())
+                self.editor.place_global(point)
+                event.accept()
+                return
+            super().mousePressEvent(event)
+
         def wheelEvent(self, event):
             factor = 1.2 if event.angleDelta().y() > 0 else 1 / 1.2
             self.scale(factor, factor)
@@ -113,6 +122,7 @@ def main(argv=None):
                              for k, v in self.points.items()}
             self.markers = {}
             self.active = None
+            self.placement_field = None
             self.stack = QUndoStack(self)
             self.scene = QGraphicsScene(self)
             self.scene.addPixmap(self.image)
@@ -121,7 +131,7 @@ def main(argv=None):
             self.scene.setSceneRect(QRectF(self.image.rect()))
             self.slip_bounds = self.calculate_slip_bounds()
             self.panel = QComboBox()
-            self.panel.addItems(["All", "A", "B", "C", "D", "E"])
+            self.panel.addItems(["All", "A", "B", "C", "D", "E", "Global"])
             self.panel.currentTextChanged.connect(self.filter_panel)
             self.field_label = QLabel("Select a marker")
             self.field_details = QLabel("Panel: — | Type: — | Value: —")
@@ -146,6 +156,21 @@ def main(argv=None):
             controls = QVBoxLayout(side)
             controls.addWidget(QLabel("Visible panel"))
             controls.addWidget(self.panel)
+            controls.addWidget(QLabel("Global options (click-to-place)"))
+            self.global_choice = QComboBox()
+            self.global_choice.addItem("Choose global selection", None)
+            for field in GLOBAL_FIELDS:
+                self.global_choice.addItem(field, field)
+            controls.addWidget(self.global_choice)
+            place_button = QPushButton("Place selected global field")
+            place_button.clicked.connect(self.start_global_placement)
+            controls.addWidget(place_button)
+            cancel_button = QPushButton("Cancel placement")
+            cancel_button.clicked.connect(self.cancel_global_placement)
+            controls.addWidget(cancel_button)
+            self.global_status = QLabel("Global fields: 0/3 mapped")
+            controls.addWidget(self.global_status)
+            self.refresh_global_status()
             controls.addWidget(self.field_label)
             controls.addWidget(self.field_details)
             nav = QHBoxLayout()
@@ -213,11 +238,19 @@ def main(argv=None):
 
         def fit_panel(self):
             panel = self.panel.currentText()
-            if panel == "All":
+            if panel == "Global":
+                positions = [m.pos() for name, m in self.markers.items()
+                             if name.startswith("global.")]
+                if not positions:
+                    QMessageBox.information(self, "Global options",
+                        "Select a global field, click Place, then click its box on the scan.")
+                    return
+            elif panel == "All":
                 self.fit_slip()
                 return
-            positions = [m.pos() for name, m in self.markers.items()
-                         if name.lower().startswith(panel.lower() + ".")]
+            if panel != "Global":
+                positions = [m.pos() for name, m in self.markers.items()
+                             if name.lower().startswith(panel.lower() + ".")]
             if positions:
                 xs = [p.x() for p in positions]
                 ys = [p.y() for p in positions]
@@ -225,6 +258,49 @@ def main(argv=None):
                               max(xs) - min(xs) + 110,
                               max(ys) - min(ys) + 90)
                 self.view.fitInView(rect, Qt.AspectRatioMode.KeepAspectRatio)
+
+        def refresh_global_status(self):
+            count = sum(key in self.markers for key in GLOBAL_FIELDS)
+            self.global_status.setText(f"Global fields: {count}/3 mapped (manual review)")
+
+        def start_global_placement(self):
+            name = self.global_choice.currentData()
+            if name not in GLOBAL_FIELDS:
+                QMessageBox.warning(self, "Select a field", "Choose a global option first.")
+                return
+            self.placement_field = name
+            self.panel.setCurrentText("All")
+            self.statusBar().showMessage(f"Click the center of {name} on the scan; Esc cancels.")
+
+        def cancel_global_placement(self):
+            self.placement_field = None
+            self.statusBar().showMessage("Placement cancelled")
+
+        def keyPressEvent(self, event):
+            if event.key() == Qt.Key.Key_Escape and self.placement_field:
+                self.cancel_global_placement()
+                return
+            super().keyPressEvent(event)
+
+        def place_global(self, point):
+            name = self.placement_field
+            self.placement_field = None
+            if name is None:
+                return
+            if not (0 <= point.x() <= self.width_px and 0 <= point.y() <= self.height_px):
+                QMessageBox.warning(self, "Outside scan", "Select a position inside the image.")
+                return
+            if name in self.markers:
+                self.move_field(name, self.markers[name].pos(), point)
+            else:
+                marker = Marker(name, point.x(), point.y(), self)
+                marker.setBrush(QBrush(QColor(255, 165, 0, 180)))
+                self.scene.addItem(marker)
+                self.markers[name] = marker
+                self.original[name] = QPointF(point)
+            self.select_field(name)
+            self.refresh_global_status()
+            self.statusBar().showMessage(f"Placed {name} — verify center at high zoom")
 
         def set_marker_size(self, size):
             for marker in self.markers.values():
@@ -291,6 +367,10 @@ def main(argv=None):
                 meta = target.with_suffix(".review.json")
                 if meta.exists():
                     raise FileExistsError(f"Refusing to overwrite review metadata: {meta}")
+                if approved:
+                    validate_global_fields(self.markers)
+                    if len(self.markers) != 218:
+                        raise ValueError(f"Expected exactly 218 fields; found {len(self.markers)}")
                 output = {}
                 for name, marker in self.markers.items():
                     pos = marker.pos()
@@ -316,7 +396,7 @@ def main(argv=None):
         def approve(self):
             response = QMessageBox.question(
                 self, "Approve mapping",
-                "Have you inspected every panel? This creates a separate "
+                "Have you inspected all five panels AND all three global options? This creates a separate "
                 "approved mapping, not a printer calibration.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No)
