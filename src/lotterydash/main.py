@@ -522,6 +522,34 @@ class MainWindow(LegacyMainWindow):
 def main():
     import sys
     app = QApplication(sys.argv)
+    app.setStyle("Fusion")
+    app.setStyleSheet("""
+        QMainWindow, QWidget { background: #f5f7fb; color: #172638;
+            font-family: "Noto Sans", "DejaVu Sans", sans-serif; font-size: 12px; }
+        QTabWidget::pane { border: 1px solid #dbe3ed; background: #ffffff; }
+        QTabBar::tab { background: #e9eef5; padding: 9px 17px;
+            margin-right: 3px; border-radius: 5px 5px 0 0; }
+        QTabBar::tab:selected { background: #ffffff; color: #1762a3;
+            font-weight: 600; }
+        QPushButton { background: #e7edf5; border: 1px solid #cbd6e3;
+            border-radius: 5px; padding: 6px 12px; min-height: 20px; }
+        QPushButton:hover { background: #d9e9f8; border-color: #8db9e3; }
+        QPushButton:pressed { background: #c7dff5; }
+        QPushButton#subtleButton { background: transparent; color: #52677f;
+            border-color: transparent; }
+        QPushButton#subtleButton:hover { background: #e7edf5; }
+        QLineEdit, QComboBox { background: white; border: 1px solid #cbd6e3;
+            border-radius: 5px; padding: 5px 7px; min-height: 22px; }
+        QLineEdit:focus, QComboBox:focus { border-color: #2683d6; }
+        QFrame#panelSheet { background: white; border: 1px solid #dce4ed;
+            border-radius: 8px; }
+        QWidget#panelRowEven { background: #f7f9fc; }
+        QWidget#panelRowOdd { background: #ffffff; }
+        QLabel#sectionTitle { font-size: 18px; font-weight: 700; }
+        QLabel#columnHeader { color: #61758c; font-size: 11px; font-weight: 600; }
+        QLabel#mutedLabel { color: #63778d; }
+        QCheckBox { spacing: 5px; }
+    """)
     window = MainWindow()
     window.show()
     return app.exec()
