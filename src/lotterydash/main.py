@@ -218,6 +218,7 @@ class MainWindow(LegacyMainWindow):
         for label, callback in (
             ("New", self.new_project_dialog),
             ("Open", self.open_project_dialog),
+            ("Setup", self.edit_game_setup),
             ("Save", self.save_project_dialog),
             ("Save As", lambda: self.save_project_dialog(True)),
         ):
@@ -342,27 +343,26 @@ class MainWindow(LegacyMainWindow):
             QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes
 
     def new_project_dialog(self):
-        from PySide6.QtWidgets import QInputDialog
-        from .projects import new_project
+        from PySide6.QtWidgets import QDialog
+        from .game_setup_wizard import GameSetupWizard
+        from .projects import new_project, save_project, project_filename
         if not self._confirm_discard():
             return
-        name, ok = QInputDialog.getText(self, "New project", "Project name")
-        if not ok or not name.strip():
+        wizard = GameSetupWizard(self, initial_game=self.game_selector.currentData())
+        if wizard.exec() != QDialog.DialogCode.Accepted:
             return
+        details = wizard.project_details()
         try:
-            project = new_project(name, self.game_selector.currentData())
-        except ValueError as exc:
-            QMessageBox.warning(self, "Invalid name", str(exc))
-            return
-        from .projects import save_project, project_filename
-        folder = Path.home() / "lotterydash-projects"
-        target = folder / project_filename(project["name"])
-        if target.exists():
-            QMessageBox.warning(
-                self, "Project already exists",
-                "A project with this name already exists. Open it or choose another name.")
-            return
-        try:
+            project = new_project(details["name"], details["game"])
+            project["game_setup"] = details["game_setup"]
+            project["notes"] = details["notes"]
+            folder = Path.home() / "lotterydash-projects"
+            target = folder / project_filename(project["name"])
+            if target.exists():
+                QMessageBox.warning(
+                    self, "Project already exists",
+                    "A project with this name already exists. Open it or choose another name.")
+                return
             save_project(target, project)
         except (OSError, ValueError) as exc:
             QMessageBox.warning(self, "Project creation failed", str(exc))
@@ -370,9 +370,35 @@ class MainWindow(LegacyMainWindow):
         self.project = project
         self.project_path = target
         self.clear()
+        self.game_selector.setCurrentIndex(self.game_selector.findData(project["game"]))
         self._game_changed()
         self.tabs.setCurrentIndex(0 if project["game"] == "pick3" else 1)
         self.statusBar().showMessage(f"Project created and saved: {target}")
+
+    def edit_game_setup(self):
+        from PySide6.QtWidgets import QDialog
+        from .game_setup_wizard import GameSetupWizard
+        from .projects import save_project
+        if self.project is None:
+            QMessageBox.information(self, "No project", "Create or open a project before editing its setup.")
+            return
+        wizard = GameSetupWizard(self, project=self.project)
+        if wizard.exec() != QDialog.DialogCode.Accepted:
+            return
+        details = wizard.project_details()
+        updated = dict(self.project)
+        updated["name"] = details["name"]
+        updated["game_setup"] = details["game_setup"]
+        updated["notes"] = details["notes"]
+        try:
+            if self.project_path is not None:
+                save_project(self.project_path, updated, overwrite=True)
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "Setup update failed", str(exc))
+            return
+        self.project = updated
+        self._game_changed()
+        self.statusBar().showMessage("Game setup saved.")
 
     def _sync_panel_plays(self):
         if self.game_selector.currentData() != "pick3":
