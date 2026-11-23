@@ -181,7 +181,17 @@ class MainWindow(LegacyMainWindow):
         old_planner = self.takeCentralWidget()
         container = QWidget()
         outer = QVBoxLayout(container)
+        from PySide6.QtWidgets import QFrame
+        header = QFrame()
+        header.setObjectName("workspaceHeader")
+        header_layout = QVBoxLayout(header)
+        header_layout.setContentsMargins(16, 12, 16, 12)
+        header_layout.setSpacing(8)
+        brand = QLabel("LOTTERYDASH  /  FLORIDA LOTTERY")
+        brand.setObjectName("brandEyebrow")
+        header_layout.addWidget(brand)
         bar = QHBoxLayout()
+        bar.setSpacing(9)
         game_label = QLabel("FLORIDA LOTTERY GAME")
         game_label.setObjectName("sectionTitle")
         bar.addWidget(game_label)
@@ -195,6 +205,7 @@ class MainWindow(LegacyMainWindow):
         self.game_selector.currentIndexChanged.connect(self._game_changed)
         bar.addWidget(self.game_selector)
         self.project_title = QLabel("No project selected")
+        self.project_title.setObjectName("projectTitle")
         bar.addWidget(self.project_title, 1)
         for label, callback in (
             ("New", self.new_project_dialog),
@@ -203,14 +214,18 @@ class MainWindow(LegacyMainWindow):
             ("Save As", lambda: self.save_project_dialog(True)),
         ):
             button = QPushButton(label)
+            button.setObjectName("primaryButton" if label == "New" else "headerAction")
             button.clicked.connect(callback)
             bar.addWidget(button)
-        outer.addLayout(bar)
+        header_layout.addLayout(bar)
+        outer.addWidget(header)
         self.game_notice = QLabel()
         self.game_notice.setWordWrap(True)
-        self.game_notice.setObjectName("mutedLabel")
+        self.game_notice.setObjectName("gameNotice")
         outer.addWidget(self.game_notice)
         self.tabs = QTabWidget()
+        self.tabs.setObjectName("workspaceTabs")
+        self.tabs.setDocumentMode(True)
         outer.addWidget(self.tabs)
         from .five_panel_editor import FivePanelEditor
         self.panel_editor = FivePanelEditor()
@@ -572,36 +587,48 @@ def main():
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     app.setStyleSheet("""
-        QMainWindow, QWidget { background: #f5f7fb; color: #172638;
-            font-family: "Noto Sans", "DejaVu Sans", sans-serif; font-size: 12px; }
-        QTabWidget::pane { border: 1px solid #dbe3ed; background: #ffffff; }
-        QTabBar::tab { background: #e9eef5; padding: 9px 17px;
-            margin-right: 3px; border-radius: 5px 5px 0 0; }
-        QTabBar::tab:selected { background: #ffffff; color: #1762a3;
-            font-weight: 600; }
-        QPushButton { background: #e7edf5; border: 1px solid #cbd6e3;
-            border-radius: 5px; padding: 6px 12px; min-height: 20px; }
-        QPushButton:hover { background: #d9e9f8; border-color: #8db9e3; }
+        QMainWindow { background: #eef2f7; color: #17283d; }
+        QWidget { color: #17283d; font-family: "Noto Sans", "DejaVu Sans", sans-serif; font-size: 12px; }
+        QFrame#workspaceHeader { background: #172d49; border: 1px solid #284565; border-radius: 12px; }
+        QFrame#workspaceHeader QLabel { color: #f4f8ff; }
+        QLabel#brandEyebrow { color: #9bc8fa; font-size: 10px; font-weight: 700; }
+        QLabel#projectTitle { color: #c8d8eb; font-size: 12px; }
+        QFrame#workspaceHeader QLabel#sectionTitle { color: #ffffff; font-size: 12px; }
+        QComboBox#primaryGameSelector { background: #ffffff; color: #17283d; border: 2px solid #79b6f1; font-weight: 700; min-height: 28px; }
+        QLabel#gameNotice { background: #e2edfa; color: #284d77; border: 1px solid #c6dcf5; border-radius: 7px; padding: 9px 12px; }
+        QTabWidget#workspaceTabs::pane { border: 1px solid #d7e1ed; background: #ffffff; border-radius: 0 9px 9px 9px; }
+        QTabBar::tab { background: #e0e7f0; color: #4c6179; padding: 10px 15px; margin-right: 3px; border: 1px solid #d2deeb; border-bottom: none; border-radius: 7px 7px 0 0; }
+        QTabBar::tab:selected { background: #ffffff; color: #1765a9; font-weight: 700; border-top: 3px solid #2685dc; padding-top: 8px; }
+        QTabBar::tab:hover:!selected { background: #d4e5f7; }
+        QTabBar::tab:disabled { color: #9ba8b8; background: #edf0f4; }
+        QPushButton { background: #e9f0f8; color: #1b3857; border: 1px solid #c7d7e8; border-radius: 7px; padding: 7px 12px; min-height: 23px; font-weight: 500; }
+        QPushButton:hover { background: #d9eafb; border-color: #8db9e3; }
         QPushButton:pressed { background: #c7dff5; }
-        QPushButton#subtleButton { background: transparent; color: #52677f;
-            border-color: transparent; }
+        QPushButton:focus { border: 2px solid #2685dc; }
+        QPushButton:disabled { color: #96a6b8; background: #edf1f5; }
+        QPushButton#primaryButton { background: #2582d5; color: white; border-color: #459ce4; font-weight: 700; }
+        QPushButton#primaryButton:hover { background: #176ab5; }
+        QPushButton#headerAction { background: #2a4565; color: #f0f6ff; border-color: #54718f; }
+        QPushButton#headerAction:hover { background: #365b80; }
+        QPushButton#subtleButton { background: transparent; color: #52677f; border-color: transparent; }
         QPushButton#subtleButton:hover { background: #e7edf5; }
-        QLineEdit, QComboBox { background: white; border: 1px solid #cbd6e3;
-            border-radius: 5px; padding: 5px 7px; min-height: 22px; }
-        QLineEdit:focus, QComboBox:focus { border-color: #2683d6; }
-        QFrame#panelSheet { background: white; border: 1px solid #dce4ed;
-            border-radius: 8px; }
-        QWidget#panelRowEven { background: #f7f9fc; }
+        QLineEdit, QComboBox { background: white; border: 1px solid #c5d3e3; border-radius: 7px; padding: 6px 8px; min-height: 23px; selection-background-color: #2685dc; }
+        QLineEdit:focus, QComboBox:focus { border: 2px solid #2685dc; }
+        QLineEdit:disabled, QComboBox:disabled { background: #edf1f5; color: #93a2b4; }
+        QFrame#panelSheet { background: white; border: 1px solid #dce4ed; border-radius: 9px; }
+        QWidget#panelRowEven { background: #f2f6fb; }
         QWidget#panelRowOdd { background: #ffffff; }
         QLabel#sectionTitle { font-size: 18px; font-weight: 700; }
-        QLabel#columnHeader { color: #61758c; font-size: 11px; font-weight: 600; }
+        QLabel#columnHeader { color: #526a84; font-size: 11px; font-weight: 700; }
         QLabel#mutedLabel { color: #63778d; }
-        QFrame#visualGuide { background: #edf4fb; border: 1px solid #d0e2f4;
-            border-radius: 7px; }
-        QProgressBar { border: 1px solid #d0deec; border-radius: 6px;
-            background: #e8edf4; text-align: center; color: #172638; }
-        QProgressBar::chunk { background: #69a5da; border-radius: 5px; }
-        QCheckBox { spacing: 5px; }
+        QFrame#visualGuide { background: #eaf3fc; border: 1px solid #c9dff5; border-radius: 9px; }
+        QProgressBar { border: 1px solid #d0deec; border-radius: 6px; background: #e8edf4; text-align: center; color: #172638; }
+        QProgressBar::chunk { background: #2582d5; border-radius: 5px; }
+        QCheckBox { spacing: 6px; }
+        QDockWidget { font-weight: 700; color: #23496e; }
+        QTextBrowser { background: #ffffff; border: 1px solid #d9e3ee; border-radius: 7px; }
+        QStatusBar { background: #e5edf6; color: #47617d; }
+        QToolTip { background: #172d49; color: #ffffff; border: 1px solid #54718f; padding: 5px; }
     """)
     from .help_tooltips import install_help
     app._lotterydash_help = install_help(app)
