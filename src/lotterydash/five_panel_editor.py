@@ -1,47 +1,63 @@
-"""Five independently editable Pick 3 panels for the project workspace."""
+"""Compact, independently editable five-row Pick 3 playslip editor."""
 from decimal import Decimal
 
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QRegularExpressionValidator
+from PySide6.QtCore import QRegularExpression
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QLineEdit,
-    QComboBox, QCheckBox, QPushButton, QGroupBox, QScrollArea, QMessageBox,
+    QComboBox, QCheckBox, QPushButton, QFrame, QHeaderView,
+    QSizePolicy,
 )
 from .models import Pick3Play, PlayType, Draw
 
 
-class PanelEditor(QGroupBox):
+class PanelEditor(QWidget):
+    """One playslip row. Attribute names retained for project integration."""
+
     def __init__(self, letter, changed, parent=None):
-        super().__init__("Panel " + letter, parent)
+        super().__init__(parent)
         self.letter = letter
         self.changed = changed
-        row = QGridLayout(self)
-        self.enabled = QCheckBox("Use this panel")
-        row.addWidget(self.enabled, 0, 0, 1, 2)
+        row = QHBoxLayout(self)
+        row.setContentsMargins(7, 5, 7, 5)
+        row.setSpacing(8)
+        self.enabled = QCheckBox(letter)
+        self.enabled.setToolTip("Include panel " + letter)
+        self.enabled.setFixedWidth(47)
+        row.addWidget(self.enabled)
         self.digits = QLineEdit()
-        self.digits.setPlaceholderText("000–999")
+        self.digits.setPlaceholderText("000")
         self.digits.setMaxLength(3)
-        self.digits.setMaximumWidth(120)
-        row.addWidget(QLabel("Numbers"), 1, 0)
-        row.addWidget(self.digits, 1, 1)
+        self.digits.setValidator(QRegularExpressionValidator(QRegularExpression("[0-9]{0,3}")))
+        self.digits.setFixedWidth(86)
+        self.digits.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        row.addWidget(self.digits)
         self.play_type = QComboBox()
         for value in PlayType:
             self.play_type.addItem(value.value.replace("_", " ").title(), value.value)
-        row.addWidget(QLabel("Play type"), 1, 2)
-        row.addWidget(self.play_type, 1, 3)
+        self.play_type.setMinimumWidth(150)
+        row.addWidget(self.play_type, 2)
         self.amount = QComboBox()
         for amount in ("1.00", "0.50"):
             self.amount.addItem("$" + amount, amount)
-        row.addWidget(QLabel("Wager"), 2, 0)
-        row.addWidget(self.amount, 2, 1)
+        self.amount.setFixedWidth(88)
+        row.addWidget(self.amount)
         self.draw = QComboBox()
         for value in Draw:
             self.draw.addItem(value.value.title(), value.value)
-        row.addWidget(QLabel("Draw time"), 2, 2)
-        row.addWidget(self.draw, 2, 3)
-        self.fireball = QCheckBox("Fireball")
-        row.addWidget(self.fireball, 3, 0, 1, 2)
-        reset = QPushButton("Clear panel " + letter)
+        self.draw.setFixedWidth(110)
+        self.draw.setCurrentIndex(1)
+        row.addWidget(self.draw)
+        self.fireball = QCheckBox()
+        self.fireball.setToolTip("Add Fireball to this panel")
+        row.addWidget(self.fireball, alignment=Qt.AlignmentFlag.AlignCenter)
+        reset = QPushButton("Clear")
+        reset.setObjectName("subtleButton")
+        reset.setFixedWidth(64)
+        reset.setToolTip("Clear panel " + letter)
         reset.clicked.connect(self.reset)
-        row.addWidget(reset, 3, 2, 1, 2)
+        row.addWidget(reset)
         self.digits.textChanged.connect(self._digits_changed)
         for signal in (
             self.enabled.toggled, self.fireball.toggled,
@@ -87,32 +103,60 @@ class FivePanelEditor(QWidget):
         super().__init__(parent)
         self.on_change = on_change
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Pick 3 — Five-panel playslip editor"))
-        layout.addWidget(QLabel(
-            "Edit panels A–E independently. Check 'Use this panel' to include it. "
-            "Save the project to retain changes."))
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        content = QWidget()
-        inner = QVBoxLayout(content)
+        layout.setContentsMargins(18, 14, 18, 14)
+        layout.setSpacing(12)
+        heading = QHBoxLayout()
+        title = QLabel("Pick 3  /  Playslip")
+        title.setObjectName("sectionTitle")
+        heading.addWidget(title)
+        heading.addStretch()
+        self.summary = QLabel("0 of 5 panels")
+        self.summary.setObjectName("mutedLabel")
+        heading.addWidget(self.summary)
+        layout.addLayout(heading)
+
+        sheet = QFrame()
+        sheet.setObjectName("panelSheet")
+        grid = QVBoxLayout(sheet)
+        grid.setContentsMargins(8, 8, 8, 8)
+        grid.setSpacing(0)
+        headers = QWidget()
+        labels = QHBoxLayout(headers)
+        labels.setContentsMargins(7, 0, 7, 5)
+        labels.setSpacing(8)
+        for title, width, stretch in (
+            ("Panel", 47, 0), ("Numbers", 86, 0), ("Play type", 150, 2),
+            ("Wager", 88, 0), ("Draw", 110, 0), ("FB", 22, 0),
+            ("", 64, 0),
+        ):
+            label = QLabel(title)
+            label.setObjectName("columnHeader")
+            if width:
+                label.setMinimumWidth(width)
+                if stretch == 0:
+                    label.setMaximumWidth(width)
+            labels.addWidget(label, stretch)
+        grid.addWidget(headers)
         self.panels = [PanelEditor(letter, self._changed) for letter in "ABCDE"]
-        for panel in self.panels:
-            inner.addWidget(panel)
-        inner.addStretch()
-        scroll.setWidget(content)
-        layout.addWidget(scroll)
+        for index, panel in enumerate(self.panels):
+            panel.setObjectName("panelRowEven" if index % 2 == 0 else "panelRowOdd")
+            grid.addWidget(panel)
+        layout.addWidget(sheet)
         footer = QHBoxLayout()
-        self.summary = QLabel("0 / 5 panels")
-        footer.addWidget(self.summary, 1)
-        clear = QPushButton("Clear all panels")
+        hint = QLabel("Enter three digits per row; filled rows are enabled automatically.")
+        hint.setObjectName("mutedLabel")
+        footer.addWidget(hint, 1)
+        clear = QPushButton("Clear all")
+        clear.setObjectName("subtleButton")
         clear.clicked.connect(self.clear_all)
         footer.addWidget(clear)
         layout.addLayout(footer)
+        layout.addStretch()
         self._changed()
 
     def _changed(self, *_):
         used = sum(p.enabled.isChecked() for p in self.panels)
-        self.summary.setText(f"{used} / 5 panels selected")
+        self.summary.setText(f"{used} of 5 panels")
         if self.on_change:
             self.on_change()
 
@@ -137,8 +181,7 @@ class FivePanelEditor(QWidget):
                 continue
             if gap:
                 raise ValueError(
-                    "Panels must be filled in order from A through E. "
-                    "Clear later panels or fill the earlier empty panel.")
+                    "Panels must be filled consecutively from A to E.")
             try:
                 play = panel.get_play()
             except ValueError as exc:
