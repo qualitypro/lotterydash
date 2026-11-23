@@ -205,6 +205,7 @@ class MainWindow(LegacyMainWindow):
         from .five_panel_editor import FivePanelEditor
         self.panel_editor = FivePanelEditor()
         self.tabs.addTab(self.panel_editor, "Play")
+        self.tabs.setTabToolTip(0, "Edit Pick 3 numbers, play types, wagers, draw times, and Fireball for panels A–E.")
         old_planner.deleteLater()
         self.project_status = QLabel("Create or open a project to begin.")
         for title, description in (
@@ -242,7 +243,9 @@ class MainWindow(LegacyMainWindow):
             elif title == "Settings":
                 column.addWidget(self.project_status)
             column.addStretch()
-            self.tabs.addTab(page, title)
+            index = self.tabs.addTab(page, title)
+            from .help_tooltips import HELP
+            self.tabs.setTabToolTip(index, HELP.get(title, title))
         self.setCentralWidget(container)
         self._game_changed()
 
@@ -550,6 +553,8 @@ def main():
         QLabel#mutedLabel { color: #63778d; }
         QCheckBox { spacing: 5px; }
     """)
+    from .help_tooltips import install_help
+    app._lotterydash_help = install_help(app)
     window = MainWindow()
     window.show()
     return app.exec()
