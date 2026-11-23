@@ -189,6 +189,9 @@ class MainWindow(LegacyMainWindow):
         self.app_title_bar = AppTitleBar(self)
         self.window_edge_controller = WindowEdgeController(self)
         outer.addWidget(self.app_title_bar)
+        from .workspace_menus import create_workspace_menus
+        self.workspace_menus = create_workspace_menus(self)
+        outer.addWidget(self.workspace_menus)
         from PySide6.QtWidgets import QFrame
         header = QFrame()
         header.setObjectName("workspaceHeader")
