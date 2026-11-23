@@ -292,10 +292,25 @@ class MainWindow(LegacyMainWindow):
         except ValueError as exc:
             QMessageBox.warning(self, "Invalid name", str(exc))
             return
+        from .projects import save_project, project_filename
+        folder = Path.home() / "lotterydash-projects"
+        target = folder / project_filename(project["name"])
+        if target.exists():
+            QMessageBox.warning(
+                self, "Project already exists",
+                "A project with this name already exists. Open it or choose another name.")
+            return
+        try:
+            save_project(target, project)
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "Project creation failed", str(exc))
+            return
         self.project = project
-        self.project_path = None
+        self.project_path = target
         self.clear()
         self._game_changed()
+        self.tabs.setCurrentIndex(0 if project["game"] == "pick3" else 1)
+        self.statusBar().showMessage(f"Project created and saved: {target}")
 
     def _serialize_plays(self):
         return [
@@ -325,11 +340,20 @@ class MainWindow(LegacyMainWindow):
         from .projects import load_project
         if not self._confirm_discard():
             return
-        filename, _ = QFileDialog.getOpenFileName(
-            self, "Open project", str(Path.home() / "lotterydash-projects"),
-            "LotteryDash projects (*.lottery.json)")
-        if not filename:
+        from PySide6.QtWidgets import QInputDialog
+        folder = Path.home() / "lotterydash-projects"
+        available = sorted(folder.glob("*.lottery.json"))
+        if not available:
+            QMessageBox.information(
+                self, "No saved projects",
+                "No projects have been saved yet. Use New to create one.")
             return
+        names = [path.name for path in available]
+        choice, ok = QInputDialog.getItem(
+            self, "Open project", "Saved projects", names, 0, False)
+        if not ok:
+            return
+        filename = str(available[names.index(choice)])
         try:
             project = load_project(Path(filename))
             if project["game"] != "pick3" and project["plays"]:
