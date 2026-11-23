@@ -81,6 +81,7 @@ class MappingWindow(QWidget):
             ("Save map", self.save_map),
             ("Load map", self.load_map),
             ("Clear marks", self.clear_marks),
+            ("Full ballot wizard", self.open_full_ballot_wizard),
         ]:
             button = QPushButton(title)
             button.clicked.connect(handler)
@@ -174,6 +175,23 @@ class MappingWindow(QWidget):
             self.canvas.points = self.points
             self.canvas.update()
             self.status.setText(f"Loaded {len(self.points)} marks")
+
+    def open_full_ballot_wizard(self):
+        """Launch a non-destructive guided mapping session."""
+        root = Path(__file__).resolve().parents[2]
+        scan = Path(self.scan_path) if self.scan_path else root / "images" / "pick3-playslip.png"
+        mapping = root / "maps" / "pick3-mapping.json"
+        if not scan.is_file() or not mapping.is_file():
+            QMessageBox.warning(self, "Mapping assets missing",
+                "Open the scan and ensure maps/pick3-mapping.json exists.")
+            return
+        from .full_ballot_mapper import FullBallotMapper
+        try:
+            self.full_ballot_wizard = FullBallotMapper(scan, mapping)
+            self.full_ballot_wizard.show()
+            self.full_ballot_wizard.raise_()
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            QMessageBox.critical(self, "Full ballot wizard", str(exc))
 
     def clear_marks(self):
         self.points.clear()
