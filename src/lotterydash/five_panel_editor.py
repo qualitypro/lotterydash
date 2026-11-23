@@ -68,18 +68,18 @@ class PanelEditor(QWidget):
         self.letter = letter
         self.changed = changed
         row = QHBoxLayout(self)
-        row.setContentsMargins(7, 5, 7, 5)
-        row.setSpacing(8)
+        row.setContentsMargins(4, 2, 4, 2)
+        row.setSpacing(5)
         self.enabled = QCheckBox(letter)
         self.enabled.setToolTip("Check panel " + letter + " to activate it. Unchecked panels are void: their values are cleared and they are excluded from saving and printing.")
-        self.enabled.setFixedWidth(47)
+        self.enabled.setFixedWidth(40)
         row.addWidget(self.enabled)
         self.digits = QLineEdit()
         self.digits.setPlaceholderText("000")
         self.digits.setToolTip("Enter exactly three digits (000–999). Leading zeros are valid.")
         self.digits.setMaxLength(3)
         self.digits.setValidator(QRegularExpressionValidator(QRegularExpression("[0-9]{0,3}")))
-        self.digits.setFixedWidth(86)
+        self.digits.setFixedWidth(66)
         self.digits.setAlignment(Qt.AlignmentFlag.AlignCenter)
         row.addWidget(self.digits)
         self.play_type = QComboBox()
@@ -90,7 +90,7 @@ class PanelEditor(QWidget):
             self.play_type.setItemData(i, PLAY_HELP.get(code, ""), Qt.ItemDataRole.ToolTipRole)
         self.play_type.currentIndexChanged.connect(self._update_play_help)
         self._update_play_help()
-        self.play_type.setMinimumWidth(150)
+        self.play_type.setMinimumWidth(120)
         row.addWidget(self.play_type, 2)
         self.amount = QComboBox()
         for amount in ("1.00", "0.50"):
@@ -98,7 +98,7 @@ class PanelEditor(QWidget):
         self.amount.setToolTip(
             "Choose a $0.50 or $1.00 base wager. Straight/Box splits its wager; "
             "Combo and Fireball may change the total cost. Do not assume this value is the ticket total.")
-        self.amount.setFixedWidth(88)
+        self.amount.setFixedWidth(69)
         row.addWidget(self.amount)
         self.draw = QComboBox()
         for value in Draw:
@@ -106,7 +106,7 @@ class PanelEditor(QWidget):
         self.draw.setToolTip(
             "Midday selects the daytime Pick 3 drawing; Evening selects the later drawing. "
             "Check ticket dates and retailer cut-off times.")
-        self.draw.setFixedWidth(110)
+        self.draw.setFixedWidth(88)
         self.draw.setCurrentIndex(1)
         row.addWidget(self.draw)
         self.fireball = QCheckBox()
@@ -114,16 +114,17 @@ class PanelEditor(QWidget):
             "FIREBALL: An optional extra wager. A separate digit is drawn and can replace "
             "one digit in the regular Pick 3 result to form additional winning combinations. "
             "Fireball has its own prize rules and additional cost.")
-        self.fireball.setFixedWidth(56)
+        self.fireball.setFixedWidth(48)
         row.addWidget(self.fireball, alignment=Qt.AlignmentFlag.AlignCenter)
-        reset = QPushButton("Clear")
+        reset = QPushButton("×")
         reset.setObjectName("subtleButton")
-        reset.setFixedWidth(64)
+        reset.setFixedWidth(49)
         reset.setToolTip("Clear panel " + letter)
         reset.clicked.connect(self.reset)
+        reset.setToolTip("Clear panel " + letter)
         row.addWidget(reset)
         self.status = QLabel("VOID")
-        self.status.setFixedWidth(84)
+        self.status.setFixedWidth(77)
         self.status.setToolTip("VOID means this panel is unchecked and will not be saved or printed.")
         row.addWidget(self.status)
         self.digits.textChanged.connect(self._digits_changed)
@@ -203,8 +204,8 @@ class FivePanelEditor(QWidget):
         super().__init__(parent)
         self.on_change = on_change
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(7, 6, 7, 6)
-        layout.setSpacing(5)
+        layout.setContentsMargins(5, 4, 5, 4)
+        layout.setSpacing(3)
         heading = QHBoxLayout()
         title = QLabel("Pick 3  /  Playslip")
         title.setObjectName("sectionTitle")
@@ -218,12 +219,12 @@ class FivePanelEditor(QWidget):
         sheet = QFrame()
         sheet.setObjectName("panelSheet")
         grid = QVBoxLayout(sheet)
-        grid.setContentsMargins(5, 4, 5, 4)
+        grid.setContentsMargins(3, 2, 3, 2)
         grid.setSpacing(0)
         headers = QWidget()
         labels = QHBoxLayout(headers)
-        labels.setContentsMargins(5, 0, 5, 2)
-        labels.setSpacing(8)
+        labels.setContentsMargins(2, 0, 2, 1)
+        labels.setSpacing(5)
         explanations = {
             "Panel": "Check A–E to activate that playslip position. Unchecked panels are void, cleared, and omitted from saving and proofs.",
             "Numbers": "Three digits for the selected panel, including leading zeros such as 007.",
@@ -233,9 +234,9 @@ class FivePanelEditor(QWidget):
             "Fireball": "Optional separately drawn digit that can replace one digit in the Pick 3 result. Adds cost and extra ways to win.",
         }
         for title, width, stretch in (
-            ("Panel", 47, 0), ("Numbers", 86, 0), ("Play type", 150, 2),
-            ("Wager", 88, 0), ("Draw", 110, 0), ("Fireball", 56, 0),
-            ("", 64, 0), ("Status", 84, 0),
+            ("Panel", 40, 0), ("Numbers", 66, 0), ("Play type", 120, 2),
+            ("Wager", 69, 0), ("Draw", 88, 0), ("Fireball", 48, 0),
+            ("", 49, 0), ("Status", 77, 0),
         ):
             label = QLabel(title)
             label.setObjectName("columnHeader")
@@ -263,6 +264,11 @@ class FivePanelEditor(QWidget):
         guide_layout = QVBoxLayout(self.guide)
         guide_layout.setContentsMargins(7, 4, 7, 4)
         guide_layout.setSpacing(1)
+        self.guide_toggle = QPushButton("Show play guide ▸")
+        self.guide_toggle.setCheckable(True)
+        self.guide_toggle.setChecked(False)
+        self.guide_toggle.setToolTip("Expand or collapse the detailed play explanation.")
+        layout.addWidget(self.guide_toggle)
         self.guide_title = QLabel("Visual play guide")
         self.guide_title.setObjectName("columnHeader")
         self.guide_example = QLabel()
@@ -275,6 +281,8 @@ class FivePanelEditor(QWidget):
         guide_layout.addWidget(self.guide_example)
         guide_layout.addWidget(self.guide_explanation)
         layout.addWidget(self.guide)
+        self.guide.hide()
+        self.guide_toggle.toggled.connect(self._toggle_guide)
         self._hover_guide = _HoverGuide(self)
         for panel in self.panels:
             for widget in (panel.digits, panel.play_type, panel.amount,
@@ -285,7 +293,7 @@ class FivePanelEditor(QWidget):
         self._guide_panel = self.panels[0]
         self.show_guide(self._guide_panel)
         footer = QHBoxLayout()
-        hint = QLabel("Check a panel to activate it; unchecked panels are void and cleared.")
+        hint = QLabel("Check A–E to activate · Unchecked panels are void")
         hint.setObjectName("mutedLabel")
         footer.addWidget(hint, 1)
         clear = QPushButton("Clear all")
@@ -294,6 +302,10 @@ class FivePanelEditor(QWidget):
         footer.addWidget(clear)
         layout.addLayout(footer)
         self._changed()
+
+    def _toggle_guide(self, expanded):
+        self.guide.setVisible(expanded)
+        self.guide_toggle.setText("Hide play guide ▾" if expanded else "Show play guide ▸")
 
     def show_guide(self, panel):
         self._guide_panel = panel
