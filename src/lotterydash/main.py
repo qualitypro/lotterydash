@@ -172,6 +172,8 @@ class MainWindow(LegacyMainWindow):
     def __init__(self):
         from PySide6.QtWidgets import QTabWidget, QGroupBox
         super().__init__()
+        from PySide6.QtCore import Qt
+        self.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
         from .projects import GAMES, GAME_GROUPS
         self.setWindowTitle("LotteryDash | Project Workspace")
         self.resize(1050, 740)
@@ -183,6 +185,9 @@ class MainWindow(LegacyMainWindow):
         outer = QVBoxLayout(container)
         outer.setContentsMargins(5, 3, 5, 3)
         outer.setSpacing(2)
+        from .app_title_bar import AppTitleBar
+        self.app_title_bar = AppTitleBar(self)
+        outer.addWidget(self.app_title_bar)
         from PySide6.QtWidgets import QFrame
         header = QFrame()
         header.setObjectName("workspaceHeader")
@@ -234,6 +239,10 @@ class MainWindow(LegacyMainWindow):
         project_button.setMenu(project_menu)
         self.project_menu_button = project_button
         bar.addWidget(project_button)
+        self.context_label = QLabel("Play")
+        self.context_label.setObjectName("toolbarContext")
+        self.context_label.setMinimumWidth(100)
+        bar.addWidget(self.context_label)
         header_layout.addLayout(bar)
         outer.addWidget(header)
         self.game_notice = QLabel()
@@ -244,6 +253,7 @@ class MainWindow(LegacyMainWindow):
         self.tabs = QTabWidget()
         self.tabs.setObjectName("workspaceTabs")
         self.tabs.setDocumentMode(True)
+        self.tabs.currentChanged.connect(self._update_toolbar_context)
         outer.addWidget(self.tabs)
         from .five_panel_editor import FivePanelEditor
         self.panel_editor = FivePanelEditor()
@@ -304,6 +314,16 @@ class MainWindow(LegacyMainWindow):
         from .context_inspector import install_context_inspector
         install_context_inspector(self)
         self._game_changed()
+        self._update_toolbar_context()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if hasattr(self, "app_title_bar"):
+            self.app_title_bar.refresh_state()
+
+    def _update_toolbar_context(self, *_):
+        if hasattr(self, "context_label") and hasattr(self, "tabs"):
+            self.context_label.setText("Workspace: " + self.tabs.tabText(self.tabs.currentIndex()))
 
     def _game_changed(self, *_):
         from .projects import GAMES
@@ -628,7 +648,7 @@ def main():
     app.setStyleSheet("""
         QMainWindow { background: #eef2f7; color: #17283d; }
         QWidget { color: #17283d; font-family: "Noto Sans", "DejaVu Sans", sans-serif; font-size: 12px; }
-        QFrame#workspaceHeader { background: #172d49; border: 1px solid #284565; border-radius: 6px; }
+        QWidget#appTitleBar { background: #101f32; border-radius: 5px; }\n        QLabel#appWindowTitle { color: #f3f7fd; font-weight: 700; font-size: 12px; }\n        QToolButton#windowControl, QToolButton#windowCloseButton { background: transparent; color: #e6eef9; border: none; font-size: 17px; }\n        QToolButton#windowControl:hover { background: #34506d; }\n        QToolButton#windowCloseButton:hover { background: #c43d48; color: white; }\n        QLabel#toolbarContext { color: #bcd5f2; font-size: 11px; }\n        QToolButton#headerAction { background: #2a4565; color: #f0f6ff; border: 1px solid #54718f; border-radius: 4px; padding: 3px 8px; }\n        QToolButton#headerAction:hover { background: #365b80; }\n        QFrame#workspaceHeader { background: #172d49; border: 1px solid #284565; border-radius: 6px; }
         QFrame#workspaceHeader QLabel { color: #f4f8ff; }
         QLabel#brandEyebrow { color: #9bc8fa; font-size: 10px; font-weight: 700; }
         QLabel#projectTitle { color: #c8d8eb; font-size: 12px; }
