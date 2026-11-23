@@ -168,7 +168,7 @@ def main(argv=None):
             cancel_button = QPushButton("Cancel placement")
             cancel_button.clicked.connect(self.cancel_global_placement)
             controls.addWidget(cancel_button)
-            self.global_status = QLabel("Global fields: 0/3 mapped")
+            self.global_status = QLabel("Global fields: 0/16 mapped")
             controls.addWidget(self.global_status)
             self.refresh_global_status()
             controls.addWidget(self.field_label)
@@ -267,7 +267,7 @@ def main(argv=None):
 
         def refresh_global_status(self):
             count = sum(key in self.markers for key in GLOBAL_FIELDS)
-            self.global_status.setText(f"Global fields: {count}/3 mapped (manual review)")
+            self.global_status.setText(f"Global fields: {count}/{len(GLOBAL_FIELDS)} mapped (manual review)")
 
         def start_global_placement(self):
             name = self.global_choice.currentData()
@@ -375,8 +375,8 @@ def main(argv=None):
                     raise FileExistsError(f"Refusing to overwrite review metadata: {meta}")
                 if approved:
                     validate_global_fields(self.markers)
-                    if len(self.markers) != 218:
-                        raise ValueError(f"Expected exactly 218 fields; found {len(self.markers)}")
+                    if len(self.markers) != 231:
+                        raise ValueError(f"Expected exactly 231 fields; found {len(self.markers)}")
                 output = {}
                 for name, marker in self.markers.items():
                     pos = marker.pos()
@@ -402,7 +402,7 @@ def main(argv=None):
         def approve(self):
             response = QMessageBox.question(
                 self, "Approve mapping",
-                "Have you inspected all five panels AND all three global options? This creates a separate "
+                "Have you inspected all five panels, Fireball, Quick Picks $10/$5, and Days 2–14? This creates a separate "
                 "approved mapping, not a printer calibration.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No)
