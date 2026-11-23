@@ -90,7 +90,7 @@ class AppTitleBar(QWidget):
         self.drag_hint.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         layout.addWidget(self.drag_hint)
         layout.addStretch()
-        self.minimize_button = self._button("—", "Minimize window", window.showMinimized)
+        self.minimize_button = self._button("−", "Minimize window", window.showMinimized)
         self.maximize_button = self._button("□", "Maximize or restore window", self.toggle_maximize)
         self.close_button = self._button("×", "Close LotteryDash", window.close)
         self.close_button.setObjectName("windowCloseButton")
