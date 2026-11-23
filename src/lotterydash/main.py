@@ -13,7 +13,7 @@ from .mapped_preview import write_mapped_preview
 from .play_mapping import resolve_fields
 
 
-class MainWindow(QMainWindow):
+class LegacyMainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("LotteryDash | Pick 3")
@@ -163,6 +163,298 @@ class MainWindow(QMainWindow):
                 QMessageBox.information(self, "Draft saved", f"Saved: {filename}")
             except (OSError, ValueError) as exc:
                 QMessageBox.critical(self, "Export failed", str(exc))
+
+
+
+class MainWindow(LegacyMainWindow):
+    """Project-aware tabbed workspace; preserves the existing Pick 3 planner."""
+
+    def __init__(self):
+        from PySide6.QtWidgets import QTabWidget, QGroupBox
+        super().__init__()
+        from .projects import GAMES
+        self.setWindowTitle("LotteryDash | Project Workspace")
+        self.resize(1050, 740)
+        self.project = None
+        self.project_path = None
+        self._loading_project = False
+        old_planner = self.takeCentralWidget()
+        container = QWidget()
+        outer = QVBoxLayout(container)
+        bar = QHBoxLayout()
+        bar.addWidget(QLabel("Game"))
+        self.game_selector = QComboBox()
+        for code, title in GAMES.items():
+            self.game_selector.addItem(title, code)
+        self.game_selector.currentIndexChanged.connect(self._game_changed)
+        bar.addWidget(self.game_selector)
+        self.project_title = QLabel("No project selected")
+        bar.addWidget(self.project_title, 1)
+        for label, callback in (
+            ("New", self.new_project_dialog),
+            ("Open", self.open_project_dialog),
+            ("Save", self.save_project_dialog),
+            ("Save As", lambda: self.save_project_dialog(True)),
+        ):
+            button = QPushButton(label)
+            button.clicked.connect(callback)
+            bar.addWidget(button)
+        outer.addLayout(bar)
+        self.tabs = QTabWidget()
+        outer.addWidget(self.tabs)
+        self.tabs.addTab(old_planner, "Play")
+        self.project_status = QLabel("Create or open a project to begin.")
+        for title, description in (
+            ("Playslip", "Preview current play selections against this project's scanned slip."),
+            ("Mapping Studio", "Edit a draft, review the 231 fields, and publish a versioned mapping."),
+            ("Print / Proof", "Export proofs. Production mapping does not imply printer calibration."),
+            ("Settings", "Project metadata and current file references."),
+        ):
+            page = QWidget()
+            column = QVBoxLayout(page)
+            column.addWidget(QLabel(description))
+            if title == "Playslip":
+                button = QPushButton("Preview mapped selections")
+                button.clicked.connect(self.preview_mapped_plays)
+                column.addWidget(button)
+            elif title == "Mapping Studio":
+                self.mapping_status = QLabel("No mapping selected")
+                column.addWidget(self.mapping_status)
+                for label, callback in (
+                    ("Choose scan", self.choose_scan),
+                    ("Choose mapping draft", self.choose_mapping),
+                    ("Edit mapping", self.edit_mapping),
+                    ("Publish reviewed mapping", self.publish_project_mapping),
+                ):
+                    button = QPushButton(label)
+                    button.clicked.connect(callback)
+                    column.addWidget(button)
+            elif title == "Print / Proof":
+                button = QPushButton("Export draft PDF")
+                button.clicked.connect(self.export)
+                column.addWidget(button)
+                button = QPushButton("Export mapped PDF proof")
+                button.clicked.connect(self.export_mapped)
+                column.addWidget(button)
+            elif title == "Settings":
+                column.addWidget(self.project_status)
+            column.addStretch()
+            self.tabs.addTab(page, title)
+        self.setCentralWidget(container)
+        self._game_changed()
+
+    def _game_changed(self, *_):
+        from .projects import GAMES
+        game = self.game_selector.currentData()
+        self.tabs.setTabEnabled(0, game == "pick3")
+        if game != "pick3" and self.tabs.currentIndex() == 0:
+            self.tabs.setCurrentIndex(1)
+        self.project_title.setText(
+            (self.project["name"] if self.project else "Unsaved project") +
+            " | " + GAMES[game])
+        self._refresh_project_status()
+
+    def _refresh_project_status(self):
+        if not hasattr(self, "project_status"):
+            return
+        if self.project is None:
+            status = "No project selected"
+        else:
+            status = (
+                f"Project: {self.project['name']}\n"
+                f"Scan: {self.project.get('scan') or 'Not selected'}\n"
+                f"Mapping draft: {self.project.get('mapping') or 'Not selected'}\n"
+                f"Production: {self.project.get('production_version') or 'Not published'}"
+            )
+        self.project_status.setText(status)
+        if hasattr(self, "mapping_status"):
+            self.mapping_status.setText(status)
+
+    def _confirm_discard(self):
+        if not self.plays and self.project is None:
+            return True
+        return QMessageBox.question(
+            self, "Switch project",
+            "Save your current project before switching. Continue without saving?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes
+
+    def new_project_dialog(self):
+        from PySide6.QtWidgets import QInputDialog
+        from .projects import new_project
+        if not self._confirm_discard():
+            return
+        name, ok = QInputDialog.getText(self, "New project", "Project name")
+        if not ok or not name.strip():
+            return
+        try:
+            project = new_project(name, self.game_selector.currentData())
+        except ValueError as exc:
+            QMessageBox.warning(self, "Invalid name", str(exc))
+            return
+        self.project = project
+        self.project_path = None
+        self.clear()
+        self._game_changed()
+
+    def _serialize_plays(self):
+        return [
+            {"digits": p.digits, "play_type": p.play_type.value,
+             "amount": str(p.amount), "draw": p.draw.value,
+             "fireball": p.fireball}
+            for p in self.plays
+        ]
+
+    def _restore_plays(self, data):
+        from decimal import Decimal
+        restored = [
+            Pick3Play(digits=p["digits"], play_type=p["play_type"],
+                      amount=Decimal(p["amount"]), draw=p["draw"],
+                      fireball=p.get("fireball", False))
+            for p in data
+        ]
+        if len(restored) > 5:
+            raise ValueError("Pick 3 supports at most five plays")
+        self.plays = restored
+        self.summary.setText(
+            f"{len(restored)} / 5 panels: " +
+            ", ".join(p.digits for p in restored))
+
+    def open_project_dialog(self):
+        from PySide6.QtWidgets import QFileDialog
+        from .projects import load_project
+        if not self._confirm_discard():
+            return
+        filename, _ = QFileDialog.getOpenFileName(
+            self, "Open project", str(Path.home() / "lotterydash-projects"),
+            "LotteryDash projects (*.lottery.json)")
+        if not filename:
+            return
+        try:
+            project = load_project(Path(filename))
+            if project["game"] != "pick3" and project["plays"]:
+                raise ValueError("Play restoration is not available for this game")
+            if project["game"] == "pick3":
+                from decimal import Decimal
+                for p in project["plays"]:
+                    Pick3Play(digits=p["digits"], play_type=p["play_type"],
+                              amount=Decimal(p["amount"]), draw=p["draw"],
+                              fireball=p.get("fireball", False))
+            self.project = project
+            self.project_path = Path(filename)
+            self.game_selector.setCurrentIndex(
+                self.game_selector.findData(project["game"]))
+            self._restore_plays(project["plays"] if project["game"] == "pick3" else [])
+            self._game_changed()
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            QMessageBox.warning(self, "Open failed", str(exc))
+
+    def save_project_dialog(self, save_as=False):
+        from PySide6.QtWidgets import QFileDialog
+        from .projects import save_project, project_filename
+        if self.project is None:
+            QMessageBox.warning(self, "No project", "Create a project first.")
+            return
+        if self.project["game"] != self.game_selector.currentData():
+            QMessageBox.warning(self, "Game mismatch",
+                                "Choose the project's game before saving.")
+            return
+        target = None if save_as else self.project_path
+        if target is None:
+            folder = Path.home() / "lotterydash-projects"
+            filename, _ = QFileDialog.getSaveFileName(
+                self, "Save project",
+                str(folder / project_filename(self.project["name"])),
+                "LotteryDash projects (*.lottery.json)")
+            if not filename:
+                return
+            target = Path(filename)
+        payload = dict(self.project)
+        payload["plays"] = self._serialize_plays() if payload["game"] == "pick3" else []
+        try:
+            save_project(target, payload, overwrite=target == self.project_path)
+            self.project = payload
+            self.project_path = target
+            self.statusBar().showMessage(f"Saved project: {target}")
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "Save failed", str(exc))
+
+    def _select_project_asset(self, key, title, pattern):
+        from PySide6.QtWidgets import QFileDialog
+        if self.project is None:
+            QMessageBox.warning(self, "No project", "Create a project first.")
+            return
+        filename, _ = QFileDialog.getOpenFileName(
+            self, title, str(Path.home()), pattern)
+        if filename:
+            self.project[key] = str(Path(filename).resolve())
+            if key == "mapping":
+                self.project["mapping_approved"] = False
+            self._refresh_project_status()
+
+    def choose_scan(self):
+        self._select_project_asset("scan", "Select scanned playslip",
+                                   "Images (*.png *.jpg *.jpeg *.tif *.tiff)")
+
+    def choose_mapping(self):
+        self._select_project_asset("mapping", "Select mapping draft",
+                                   "JSON mappings (*.json)")
+
+    def edit_mapping(self):
+        import subprocess
+        import sys
+        from datetime import datetime
+        if self.project is None or not self.project.get("scan") or not self.project.get("mapping"):
+            QMessageBox.warning(self, "Missing assets",
+                                "Choose a scan and mapping draft first.")
+            return
+        if self.project["game"] != "pick3":
+            QMessageBox.warning(self, "Editor unavailable",
+                                "This game's mapping schema and editor are not implemented yet.")
+            return
+        folder = Path.home() / "lotterydash-projects" / "reviews" / (
+            "editor-" + datetime.now().strftime("%Y%m%d-%H%M%S-%f"))
+        args = [
+            sys.executable, "-m", "lotterydash.automap_editor",
+            "--image", self.project["scan"],
+            "--mapping", self.project["mapping"],
+            "--output-dir", str(folder),
+        ]
+        try:
+            self._editor_process = subprocess.Popen(args)
+            self.statusBar().showMessage("AutoMap editor launched; import its saved draft when done")
+        except OSError as exc:
+            QMessageBox.warning(self, "Editor failed", str(exc))
+
+    def publish_project_mapping(self):
+        from uuid import uuid4
+        from .production_mapping import publish_mapping
+        if self.project is None or not self.project.get("mapping"):
+            QMessageBox.warning(self, "Missing mapping", "Choose a mapping draft first.")
+            return
+        response = QMessageBox.question(
+            self, "Publish mapping",
+            "Have you visually reviewed all fields? Publication creates a separate "
+            "versioned snapshot, NOT a printer calibration.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        if response != QMessageBox.StandardButton.Yes:
+            return
+        if not self.project.get("project_id"):
+            self.project["project_id"] = uuid4().hex
+        try:
+            record = publish_mapping(
+                self.project, Path(self.project["mapping"]),
+                Path.home() / "lotterydash-projects" / "mapping-versions",
+                reviewed=True)
+            self.project["production_version"] = record["version"]
+            self.project["mapping_approved"] = True
+            self._refresh_project_status()
+            QMessageBox.information(
+                self, "Mapping published",
+                f"Version: {record['version']}\nSave the project to retain this reference.")
+        except (OSError, ValueError, KeyError) as exc:
+            QMessageBox.warning(self, "Publication failed", str(exc))
 
 
 def main():
