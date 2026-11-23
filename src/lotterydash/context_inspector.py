@@ -21,7 +21,7 @@ class ContextInspector(QDockWidget):
                              Qt.DockWidgetArea.RightDockWidgetArea)
         body = QWidget()
         layout = QVBoxLayout(body)
-        layout.setContentsMargins(9, 8, 9, 8)
+        layout.setContentsMargins(5, 5, 5, 5)
         header = QHBoxLayout()
         self.pin = QCheckBox("Pin")
         self.pin.setToolTip("Keep the current explanation while navigating other controls.")
@@ -160,8 +160,8 @@ class ContextTracker(QObject):
 def install_context_inspector(window):
     dock = ContextInspector(window)
     window.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
-    dock.setMinimumWidth(260)
-    dock.resize(310, 500)
+    dock.setMinimumWidth(200)
+    dock.resize(230, 450)
     tracker = ContextTracker(window, dock)
     QApplication.instance().installEventFilter(tracker)
     window._context_tracker = tracker
