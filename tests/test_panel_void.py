@@ -57,3 +57,15 @@ def test_panel_readiness_states(app):
     panel.enabled.setChecked(False)
     assert panel.status.text() == "VOID"
     assert editor.progress.value() == 0
+
+
+def test_compact_guide_can_expand_and_collapse(app):
+    editor = FivePanelEditor()
+    assert not editor.guide.isVisible()
+    assert not editor.guide_toggle.isChecked()
+    editor.guide_toggle.setChecked(True)
+    assert editor.guide_toggle.isChecked()
+    assert not editor.guide.isHidden()
+    editor.guide_toggle.setChecked(False)
+    assert editor.guide.isHidden()
+    assert len(editor.panels) == 5
