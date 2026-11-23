@@ -123,7 +123,7 @@ class PanelEditor(QWidget):
         reset.clicked.connect(self.reset)
         row.addWidget(reset)
         self.status = QLabel("VOID")
-        self.status.setFixedWidth(64)
+        self.status.setFixedWidth(84)
         self.status.setToolTip("VOID means this panel is unchecked and will not be saved or printed.")
         row.addWidget(self.status)
         self.digits.textChanged.connect(self._digits_changed)
@@ -154,8 +154,7 @@ class PanelEditor(QWidget):
                     widget.blockSignals(previous)
         for widget in (self.digits, self.play_type, self.amount, self.draw, self.fireball):
             widget.setEnabled(active)
-        if notify:
-            self._refresh_status()
+        self._refresh_status()
         if notify:
             self.changed()
 
@@ -236,7 +235,7 @@ class FivePanelEditor(QWidget):
         for title, width, stretch in (
             ("Panel", 47, 0), ("Numbers", 86, 0), ("Play type", 150, 2),
             ("Wager", 88, 0), ("Draw", 110, 0), ("Fireball", 56, 0),
-            ("", 64, 0), ("Status", 64, 0),
+            ("", 64, 0), ("Status", 84, 0),
         ):
             label = QLabel(title)
             label.setObjectName("columnHeader")
