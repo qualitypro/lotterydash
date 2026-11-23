@@ -1,5 +1,13 @@
 """Last selected Florida Lottery game persists between application windows."""
+import pytest
 from PySide6.QtCore import QSettings
+from PySide6.QtWidgets import QApplication
+
+
+@pytest.fixture(scope="module")
+def app():
+    return QApplication.instance() or QApplication([])
+
 from lotterydash.main import MainWindow
 
 
