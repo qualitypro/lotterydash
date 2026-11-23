@@ -1,0 +1,259 @@
+"""Sprint 04D — interactive, non-destructive AutoMap review editor.
+
+Launch: python -m lotterydash.automap_editor --image ... --mapping ...
+The input mapping is never written. Approval creates a separately named copy.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+
+from .calibration import ScanPoint, load_mapping, save_mapping
+
+
+def safe_destination(source: Path, destination: Path):
+    """Prevent writes to the source mapping or existing files."""
+    source = Path(source).resolve()
+    destination = Path(destination).resolve()
+    if source == destination:
+        raise ValueError("Refusing to overwrite the source mapping")
+    if destination.exists():
+        raise FileExistsError(f"Refusing to overwrite existing file: {destination}")
+    return destination
+
+
+def load_review_data(mapping_path: Path):
+    data = json.loads(Path(mapping_path).read_text(encoding="utf-8"))
+    points = load_mapping(mapping_path)
+    return points, data
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Interactive AutoMap review and correction")
+    parser.add_argument("--image", type=Path, required=True)
+    parser.add_argument("--mapping", type=Path, required=True)
+    parser.add_argument("--output-dir", type=Path, default=Path("images/diagnostics/automap-editor"))
+    args = parser.parse_args(argv)
+    from PySide6.QtCore import Qt, QPointF, QRectF, Signal
+    from PySide6.QtGui import QColor, QBrush, QPen, QPixmap, QPainter, QUndoCommand, QUndoStack
+    from PySide6.QtWidgets import (
+        QApplication, QGraphicsEllipseItem, QGraphicsPixmapItem,
+        QGraphicsScene, QGraphicsView, QHBoxLayout, QVBoxLayout,
+        QMainWindow, QWidget, QLabel, QPushButton, QComboBox,
+        QMessageBox, QSplitter, QFormLayout, QDoubleSpinBox
+    )
+
+    class Marker(QGraphicsEllipseItem):
+        def __init__(self, name, x, y, scene_view):
+            super().__init__(-5, -5, 10, 10)
+            self.field = name
+            self.editor = scene_view
+            self.setPos(x, y)
+            self.setBrush(QBrush(QColor(0, 210, 120, 130)))
+            self.setPen(QPen(QColor(0, 100, 55), 1.5))
+            self.setFlag(self.GraphicsItemFlag.ItemIsMovable)
+            self.setFlag(self.GraphicsItemFlag.ItemIsSelectable)
+            self.setFlag(self.GraphicsItemFlag.ItemSendsGeometryChanges)
+            self.setZValue(10)
+            self.setToolTip(name)
+            self._start = QPointF(x, y)
+
+        def mousePressEvent(self, event):
+            self._start = QPointF(self.pos())
+            super().mousePressEvent(event)
+            self.editor.select_field(self.field)
+
+        def mouseReleaseEvent(self, event):
+            super().mouseReleaseEvent(event)
+            end = QPointF(self.pos())
+            if (end - self._start).manhattanLength() > .01:
+                self.editor.move_field(self.field, self._start, end)
+            self.editor.update_coordinates()
+
+    class MoveCommand(QUndoCommand):
+        def __init__(self, editor, field, before, after):
+            super().__init__(f"Move {field}")
+            self.editor = editor
+            self.field = field
+            self.before = QPointF(before)
+            self.after = QPointF(after)
+
+        def undo(self):
+            self.editor.apply_position(self.field, self.before)
+
+        def redo(self):
+            self.editor.apply_position(self.field, self.after)
+
+    class Canvas(QGraphicsView):
+        def __init__(self, editor):
+            super().__init__()
+            self.editor = editor
+            self.setDragMode(self.DragMode.ScrollHandDrag)
+            self.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            self.setTransformationAnchor(self.ViewportAnchor.AnchorUnderMouse)
+
+        def wheelEvent(self, event):
+            factor = 1.2 if event.angleDelta().y() > 0 else 1 / 1.2
+            self.scale(factor, factor)
+
+    class Editor(QMainWindow):
+        def __init__(self):
+            super().__init__()
+            self.setWindowTitle("LotteryDash — AutoMap Editor (review only)")
+            self.source = args.mapping
+            self.points, self.source_data = load_review_data(self.source)
+            self.image = QPixmap(str(args.image))
+            if self.image.isNull():
+                raise ValueError(f"Cannot load playslip image: {args.image}")
+            self.width_px, self.height_px = self.image.width(), self.image.height()
+            self.original = {k: QPointF(v.x * self.width_px, v.y * self.height_px)
+                             for k, v in self.points.items()}
+            self.markers = {}
+            self.active = None
+            self.stack = QUndoStack(self)
+            self.scene = QGraphicsScene(self)
+            self.scene.addPixmap(self.image)
+            self.view = Canvas(self)
+            self.view.setScene(self.scene)
+            self.scene.setSceneRect(QRectF(self.image.rect()))
+            self.panel = QComboBox()
+            self.panel.addItems(["All", "A", "B", "C", "D", "E"])
+            self.panel.currentTextChanged.connect(self.filter_panel)
+            self.field_label = QLabel("Select a marker")
+            self.field_label.setWordWrap(True)
+            self.x_spin = QDoubleSpinBox()
+            self.y_spin = QDoubleSpinBox()
+            for spin in (self.x_spin, self.y_spin):
+                spin.setRange(0.0, 1.0)
+                spin.setDecimals(7)
+                spin.setSingleStep(.0001)
+            self.x_spin.editingFinished.connect(self.apply_numeric)
+            self.y_spin.editingFinished.connect(self.apply_numeric)
+            for name, point in sorted(self.original.items()):
+                marker = Marker(name, point.x(), point.y(), self)
+                self.scene.addItem(marker)
+                self.markers[name] = marker
+            self.panel.setCurrentText("All")
+            self.filter_panel("All")
+
+            side = QWidget()
+            controls = QVBoxLayout(side)
+            controls.addWidget(QLabel("Visible panel"))
+            controls.addWidget(self.panel)
+            controls.addWidget(self.field_label)
+            form = QFormLayout()
+            form.addRow("X (normalized)", self.x_spin)
+            form.addRow("Y (normalized)", self.y_spin)
+            controls.addLayout(form)
+            for label, callback in (
+                ("Undo", self.stack.undo),
+                ("Redo", self.stack.redo),
+                ("Reset selected field", self.reset_selected),
+                ("Save draft mapping", self.save_draft),
+                ("Approve as separate mapping", self.approve),
+            ):
+                button = QPushButton(label)
+                button.clicked.connect(callback)
+                controls.addWidget(button)
+            controls.addStretch()
+            controls.addWidget(QLabel("Original mapping is read-only.\n"
+                                     "Drag markers, or edit normalized coordinates.\n"
+                                     "Mouse wheel zooms; drag background to pan."))
+            splitter = QSplitter()
+            splitter.addWidget(self.view)
+            splitter.addWidget(side)
+            splitter.setStretchFactor(0, 5)
+            splitter.setStretchFactor(1, 1)
+            self.setCentralWidget(splitter)
+            self.resize(1200, 850)
+            self.view.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
+            self.statusBar().showMessage(f"{len(self.markers)} fields loaded — review required")
+
+        def filter_panel(self, value):
+            for name, marker in self.markers.items():
+                marker.setVisible(value == "All" or name.lower().startswith(value.lower() + "."))
+
+        def select_field(self, name):
+            self.active = name
+            self.field_label.setText(name)
+            self.update_coordinates()
+
+        def update_coordinates(self):
+            if self.active not in self.markers:
+                return
+            pos = self.markers[self.active].pos()
+            self.x_spin.blockSignals(True)
+            self.y_spin.blockSignals(True)
+            self.x_spin.setValue(pos.x() / self.width_px)
+            self.y_spin.setValue(pos.y() / self.height_px)
+            self.x_spin.blockSignals(False)
+            self.y_spin.blockSignals(False)
+
+        def apply_position(self, field, pos):
+            x = min(max(pos.x(), 0), self.width_px)
+            y = min(max(pos.y(), 0), self.height_px)
+            self.markers[field].setPos(QPointF(x, y))
+            self.update_coordinates()
+
+        def move_field(self, field, before, after):
+            self.stack.push(MoveCommand(self, field, before, after))
+
+        def apply_numeric(self):
+            if self.active is None:
+                return
+            marker = self.markers[self.active]
+            new = QPointF(self.x_spin.value() * self.width_px,
+                          self.y_spin.value() * self.height_px)
+            if (new - marker.pos()).manhattanLength() > .01:
+                self.move_field(self.active, marker.pos(), new)
+
+        def reset_selected(self):
+            if self.active:
+                self.move_field(self.active, self.markers[self.active].pos(),
+                                self.original[self.active])
+
+        def export(self, approved):
+            target = args.output_dir / ("automap-approved.json" if approved else "automap-draft.json")
+            try:
+                target = safe_destination(self.source, target)
+                output = {}
+                for name, marker in self.markers.items():
+                    pos = marker.pos()
+                    output[name] = ScanPoint(
+                        min(1, max(0, pos.x() / self.width_px)),
+                        min(1, max(0, pos.y() / self.height_px)))
+                save_mapping(target, output, self.width_px, self.height_px)
+                # Approval is stored in a separate metadata document; the
+                # mapping remains schema v1 compatible with existing tools.
+                meta = target.with_suffix(".review.json")
+                meta.write_text(json.dumps({
+                    "approved": approved, "source": str(self.source),
+                    "field_count": len(output),
+                    "review_method": "manual_editor",
+                }, indent=2) + "\n", encoding="utf-8")
+                QMessageBox.information(self, "Saved", str(target))
+            except Exception as exc:
+                QMessageBox.critical(self, "Save failed", str(exc))
+
+        def save_draft(self):
+            self.export(False)
+
+        def approve(self):
+            response = QMessageBox.question(
+                self, "Approve mapping",
+                "Have you inspected every panel? This creates a separate "
+                "approved mapping, not a printer calibration.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No)
+            if response == QMessageBox.StandardButton.Yes:
+                self.export(True)
+
+    app = QApplication.instance() or QApplication([])
+    window = Editor()
+    window.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
