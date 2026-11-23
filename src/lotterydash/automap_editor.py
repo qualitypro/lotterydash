@@ -226,7 +226,7 @@ def main(argv=None):
             ys = [p.y() for p in positions]
             # The printed logo/instructions extend beyond the selection fields.
             margin_x = max(100, (max(xs) - min(xs)) * .65)
-            margin_y = max(90, (max(ys) - min(ys)) * .17)
+            margin_y = max(300, (max(ys) - min(ys)) * .45)
             left = max(0, min(xs) - margin_x)
             top = max(0, min(ys) - margin_y)
             right = min(self.width_px, max(xs) + margin_x)
@@ -242,8 +242,14 @@ def main(argv=None):
                 positions = [m.pos() for name, m in self.markers.items()
                              if name.startswith("global.")]
                 if not positions:
-                    QMessageBox.information(self, "Global options",
-                        "Select a global field, click Place, then click its box on the scan.")
+                    panel_a = [m.pos() for name, m in self.markers.items()
+                               if name.startswith("a.")]
+                    if panel_a:
+                        low = max(p.y() for p in panel_a)
+                        left = min(p.x() for p in panel_a) - 250
+                        self.view.fitInView(QRectF(max(0, left), low + 20,
+                            650, min(650, self.height_px - low - 20)),
+                            Qt.AspectRatioMode.KeepAspectRatio)
                     return
             elif panel == "All":
                 self.fit_slip()
