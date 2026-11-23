@@ -12,6 +12,15 @@ from PySide6.QtWidgets import (
 from .models import Pick3Play, PlayType, Draw
 
 
+PLAY_HELP = {
+    "straight": "STRAIGHT: Your three digits must match the drawn digits in the same order. Example: 123 wins only on 123.",
+    "box": "BOX: Your digits can match in any order. Three distinct digits have 6 possible orders; one repeated digit gives 3. All three equal digits do not make a standard Box play.",
+    "straight_box": "STRAIGHT/BOX: Combines an exact-order Straight play with a Box play. The selected wager is divided between the two components.",
+    "combo": "COMBO: Covers each distinct arrangement of the three selected digits as a separate Straight combination. Cost depends on the number of combinations; verify the total before purchasing.",
+    "front_pair": "FRONT PAIR: The first two selected digits must match the first two drawn digits in exact order. The third digit does not determine this pair win.",
+    "back_pair": "BACK PAIR: The last two selected digits must match the last two drawn digits in exact order. The first digit does not determine this pair win.",
+}
+
 class PanelEditor(QWidget):
     """One playslip row. Attribute names retained for project integration."""
 
@@ -37,24 +46,35 @@ class PanelEditor(QWidget):
         self.play_type = QComboBox()
         for value in PlayType:
             self.play_type.addItem(value.value.replace("_", " ").title(), value.value)
-        self.play_type.setToolTip("Choose how this panel is played, such as Straight or Box. Each type has different winning conditions.")
+        for i in range(self.play_type.count()):
+            code = self.play_type.itemData(i)
+            self.play_type.setItemData(i, PLAY_HELP.get(code, ""), Qt.ItemDataRole.ToolTipRole)
+        self.play_type.currentIndexChanged.connect(self._update_play_help)
+        self._update_play_help()
         self.play_type.setMinimumWidth(150)
         row.addWidget(self.play_type, 2)
         self.amount = QComboBox()
         for amount in ("1.00", "0.50"):
             self.amount.addItem("$" + amount, amount)
-        self.amount.setToolTip("Choose the wager amount for this panel. This is the base wager, not a calculated total.")
+        self.amount.setToolTip(
+            "Choose a $0.50 or $1.00 base wager. Straight/Box splits its wager; "
+            "Combo and Fireball may change the total cost. Do not assume this value is the ticket total.")
         self.amount.setFixedWidth(88)
         row.addWidget(self.amount)
         self.draw = QComboBox()
         for value in Draw:
             self.draw.addItem(value.value.title(), value.value)
-        self.draw.setToolTip("Select the draw associated with this panel, such as Midday or Evening.")
+        self.draw.setToolTip(
+            "Midday selects the daytime Pick 3 drawing; Evening selects the later drawing. "
+            "Check ticket dates and retailer cut-off times.")
         self.draw.setFixedWidth(110)
         self.draw.setCurrentIndex(1)
         row.addWidget(self.draw)
         self.fireball = QCheckBox()
-        self.fireball.setToolTip("Fireball (FB): optional Pick 3 add-on using a separately drawn Fireball number. It changes the wager and prize possibilities; verify official rules before playing.")
+        self.fireball.setToolTip(
+            "FIREBALL: An optional extra wager. A separate digit is drawn and can replace "
+            "one digit in the regular Pick 3 result to form additional winning combinations. "
+            "Fireball has its own prize rules and additional cost.")
         self.fireball.setFixedWidth(56)
         row.addWidget(self.fireball, alignment=Qt.AlignmentFlag.AlignCenter)
         reset = QPushButton("Clear")
@@ -70,6 +90,9 @@ class PanelEditor(QWidget):
             self.draw.currentIndexChanged,
         ):
             signal.connect(self.changed)
+
+    def _update_play_help(self, *_):
+        self.play_type.setToolTip(PLAY_HELP.get(self.play_type.currentData(), "Select the play type."))
 
     def _digits_changed(self, text):
         if text and not self.enabled.isChecked():
@@ -132,10 +155,10 @@ class FivePanelEditor(QWidget):
         explanations = {
             "Panel": "Panels A–E correspond to the five play positions on the physical playslip. Check a letter to include it.",
             "Numbers": "Three digits for the selected panel, including leading zeros such as 007.",
-            "Play type": "How the numbers are played; the choice affects the winning conditions.",
-            "Wager": "Base wager selected for this individual panel.",
-            "Draw": "Which draw this panel applies to.",
-            "Fireball": "Optional Fireball add-on. Hover over each checkbox for details.",
+            "Play type": "Straight requires exact order; Box allows any order; Straight/Box combines both; Combo covers arrangements; Front/Back Pair use two digits. Hover over the selector for the chosen type.",
+            "Wager": "Choose a $0.50 or $1.00 base wager. Combo and Fireball can increase total ticket cost.",
+            "Draw": "Midday or Evening Pick 3 drawing. Verify the ticket date and purchase cut-off.",
+            "Fireball": "Optional separately drawn digit that can replace one digit in the Pick 3 result. Adds cost and extra ways to win.",
         }
         for title, width, stretch in (
             ("Panel", 47, 0), ("Numbers", 86, 0), ("Play type", 150, 2),
