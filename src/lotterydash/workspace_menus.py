@@ -46,9 +46,13 @@ def create_workspace_menus(window):
     for name in ("Play", "Playslip", "Mapping Studio", "Print / Proof", "Settings", "Element Guide"):
         action(view_menu, name, lambda n=name: tab(n))
     view_menu.addSeparator()
-    context_action = window.context_inspector.toggleViewAction()
-    context_action.setText("Context Help")
+    context_action = QAction("Context Help", window)
+    context_action.setCheckable(True)
+    context_action.setChecked(True)
+    context_action.triggered.connect(
+        lambda checked=False: window.context_inspector.setVisible(checked))
     view_menu.addAction(context_action)
+    window.context_help_menu_action = context_action
     action(view_menu, "Toggle Maximize", window.app_title_bar.toggle_maximize, "F11")
 
     mapping_menu = bar.addMenu("&Mapping")
