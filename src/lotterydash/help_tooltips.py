@@ -15,9 +15,9 @@ HELP = {
     "Open": "Choose an existing saved LotteryDash project.",
     "Save": "Save the current project and its panel selections.",
     "Save As": "Save a copy of the current project under another filename.",
-    "Game": "Select a lottery game. Some games do not yet have an implemented play editor.",
-    "Play": "Enter and edit the five playslip panels.",
-    "Playslip": "Inspect play selections against the scanned playslip.",
+    "Game": "Choose the lottery game for this project. Pick 3 has an editable five-panel playslip; other games may have limited editing support.",
+    "Play": "Set up to five Pick 3 plays. Each row specifies digits, how to match them, wager, draw and optional Fireball.",
+    "Playslip": "Inspect which bubbles would be selected on the scanned playslip. This is a visual check, not proof of printer calibration.",
     "Mapping Studio": "Choose a scan and edit bubble positions. Review mappings before publication.",
     "Print / Proof": "Generate PDF proofs. A proof is not confirmation of printer alignment.",
     "Settings": "View project metadata and asset references.",
@@ -30,6 +30,8 @@ HELP = {
     "Export mapped PDF proof": "Create a scan-aligned visual proof; verify printer alignment separately.",
     "Clear all": "Reset all five panels. Save the project afterward to retain the change.",
     "Clear": "Reset this panel only.",
+    "Pick 3  /  Playslip": "Each row represents a physical Pick 3 panel, A through E. Choose numbers, play type, wager, draw and Fireball.",
+    "0 of 5 panels": "Shows how many of the five possible Pick 3 panels are currently enabled.",
 }
 
 
