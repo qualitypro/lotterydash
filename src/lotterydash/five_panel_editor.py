@@ -1,13 +1,14 @@
 """Compact, independently editable five-row Pick 3 playslip editor."""
 from decimal import Decimal
+from itertools import permutations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QObject, QEvent
 from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtCore import QRegularExpression
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QLineEdit,
     QComboBox, QCheckBox, QPushButton, QFrame, QHeaderView,
-    QSizePolicy,
+    QSizePolicy, QProgressBar,
 )
 from .models import Pick3Play, PlayType, Draw
 
@@ -20,6 +21,44 @@ PLAY_HELP = {
     "front_pair": "FRONT PAIR: The first two selected digits must match the first two drawn digits in exact order. The third digit does not determine this pair win.",
     "back_pair": "BACK PAIR: The last two selected digits must match the last two drawn digits in exact order. The first digit does not determine this pair win.",
 }
+
+def visual_example(digits, play_type):
+    """Return explanatory text only; not a prize or ticket-cost calculator."""
+    digits = digits if len(digits) == 3 and digits.isascii() and digits.isdigit() else "123"
+    arrangements = sorted({"".join(p) for p in permutations(digits)})
+    if play_type == "straight":
+        return f"Exact order only:  [ {digits} ]"
+    if play_type == "box":
+        if len(arrangements) == 1:
+            return f"{digits}: all digits identical; standard Box is not applicable."
+        return f"{len(arrangements)} possible orders:  " + "   ".join(arrangements)
+    if play_type == "straight_box":
+        return f"Straight: {digits}   |   Box: " + " · ".join(arrangements)
+    if play_type == "combo":
+        return f"{len(arrangements)} distinct Straight arrangements: " + " · ".join(arrangements)
+    if play_type == "front_pair":
+        return f"Match the first two digits: [ {digits[:2]} ] X"
+    if play_type == "back_pair":
+        return f"Match the last two digits: X [ {digits[1:]} ]"
+    return "Select a play type to see an example."
+
+
+class _HoverGuide(QObject):
+    def __init__(self, owner):
+        super().__init__(owner)
+        self.owner = owner
+
+    def eventFilter(self, watched, event):
+        if event.type() in (QEvent.Type.Enter, QEvent.Type.FocusIn):
+            for panel in self.owner.panels:
+                if watched in (
+                    panel.digits, panel.play_type, panel.amount,
+                    panel.draw, panel.fireball, panel.enabled,
+                ):
+                    self.owner.show_guide(panel)
+                    break
+        return False
+
 
 class PanelEditor(QWidget):
     """One playslip row. Attribute names retained for project integration."""
@@ -179,6 +218,39 @@ class FivePanelEditor(QWidget):
             panel.setObjectName("panelRowEven" if index % 2 == 0 else "panelRowOdd")
             grid.addWidget(panel)
         layout.addWidget(sheet)
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 5)
+        self.progress.setTextVisible(True)
+        self.progress.setFormat("%v / 5 panels configured")
+        self.progress.setMaximumHeight(16)
+        self.progress.setToolTip("Number of enabled panels. This is not a guarantee that every entry is valid.")
+        layout.addWidget(self.progress)
+        self.guide = QFrame()
+        self.guide.setObjectName("visualGuide")
+        guide_layout = QVBoxLayout(self.guide)
+        guide_layout.setContentsMargins(12, 8, 12, 8)
+        guide_layout.setSpacing(3)
+        self.guide_title = QLabel("Visual play guide")
+        self.guide_title.setObjectName("columnHeader")
+        self.guide_example = QLabel()
+        self.guide_example.setWordWrap(True)
+        self.guide_example.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.guide_explanation = QLabel()
+        self.guide_explanation.setWordWrap(True)
+        self.guide_explanation.setObjectName("mutedLabel")
+        guide_layout.addWidget(self.guide_title)
+        guide_layout.addWidget(self.guide_example)
+        guide_layout.addWidget(self.guide_explanation)
+        layout.addWidget(self.guide)
+        self._hover_guide = _HoverGuide(self)
+        for panel in self.panels:
+            for widget in (panel.digits, panel.play_type, panel.amount,
+                           panel.draw, panel.fireball, panel.enabled):
+                widget.installEventFilter(self._hover_guide)
+            panel.digits.textChanged.connect(self._refresh_guide)
+            panel.play_type.currentIndexChanged.connect(self._refresh_guide)
+        self._guide_panel = self.panels[0]
+        self.show_guide(self._guide_panel)
         footer = QHBoxLayout()
         hint = QLabel("Enter three digits per row; filled rows are enabled automatically.")
         hint.setObjectName("mutedLabel")
@@ -191,9 +263,22 @@ class FivePanelEditor(QWidget):
         layout.addStretch()
         self._changed()
 
+    def show_guide(self, panel):
+        self._guide_panel = panel
+        kind = panel.play_type.currentData()
+        self.guide_title.setText(f"Panel {panel.letter}  ·  {panel.play_type.currentText()}")
+        self.guide_example.setText(visual_example(panel.digits.text(), kind))
+        self.guide_explanation.setText(PLAY_HELP.get(kind, ""))
+
+    def _refresh_guide(self, *_):
+        if hasattr(self, "_guide_panel"):
+            self.show_guide(self._guide_panel)
+
     def _changed(self, *_):
         used = sum(p.enabled.isChecked() for p in self.panels)
         self.summary.setText(f"{used} of 5 panels")
+        if hasattr(self, "progress"):
+            self.progress.setValue(used)
         if self.on_change:
             self.on_change()
 
