@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .automap import Candidate, _cv, _load_gray, detect_candidates, match_fields
 from .calibration import ScanPoint, load_mapping, save_mapping
+from .box_recovery import recover_exceptions
 
 PANELS = "ABCDE"
 
@@ -110,6 +111,7 @@ def run(image, mapping, output_dir, tolerance=6, expected=5,
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     preview = cv2.imread(str(image))
+    recovered, unresolved = recover_exceptions(gray, fields, panels, width, height)
     proposed = {}
     details = {}
     for name, panel in panels.items():
@@ -124,6 +126,8 @@ def run(image, mapping, output_dir, tolerance=6, expected=5,
             cv2.circle(preview, (round(candidate.x), round(candidate.y)),
                        6, (0, 180, 0), 2)
         for field in panel["missing"]:
+            if name.lower() + field[1:] in recovered:
+                continue
             p = fields[field]
             x = round(p.x * width + panel["dx"])
             y = round(p.y * height + panel["dy"])
@@ -143,9 +147,20 @@ def run(image, mapping, output_dir, tolerance=6, expected=5,
         details[name]["ambiguous"] = [
             name.lower() + key[1:] for key in panel["ambiguous"]
         ]
+        details[name]["recovered"] = [
+            key for key in recovered if key.startswith(name.lower() + ".")
+        ]
+    for key, recovery in recovered.items():
+        proposed[key] = ScanPoint(recovery.x / width, recovery.y / height)
+        cv2.circle(preview, (round(recovery.x), round(recovery.y)),
+                   8, (0, 180, 255), 2)
     complete = (len(panels) == expected and
-                all(p["matched"] == len(fields) and
-                    not p["ambiguous"] for p in panels.values()))
+                len(proposed) == expected * len(fields) and
+                not unresolved and
+                all(not (set(p["ambiguous"]) - {
+                    "a." + key.split(".", 1)[1] for key in recovered
+                    if key.startswith(name.lower() + ".")
+                }) for name, p in panels.items()))
     report = {
         "status": "review_required", "approved": False,
         "complete_detection": complete,
@@ -153,7 +168,12 @@ def run(image, mapping, output_dir, tolerance=6, expected=5,
         "detected_candidates": len(candidates),
         "expected_panels": expected, "discovered_panels": len(panels),
         "expected_fields": expected * len(fields),
-        "matched_fields": len(proposed), "panels": details,
+        "matched_fields": len(proposed),
+        "template_recovered": {key: {"score": round(r.score, 4),
+                                     "margin": round(r.margin, 4),
+                                     "x": r.x, "y": r.y}
+                               for key, r in recovered.items()},
+        "unresolved_recovery": unresolved, "panels": details,
     }
     (output_dir / "full-slip-report.json").write_text(
         json.dumps(report, indent=2) + "\n", encoding="utf-8")
