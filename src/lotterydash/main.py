@@ -551,6 +551,11 @@ def main():
         QLabel#sectionTitle { font-size: 18px; font-weight: 700; }
         QLabel#columnHeader { color: #61758c; font-size: 11px; font-weight: 600; }
         QLabel#mutedLabel { color: #63778d; }
+        QFrame#visualGuide { background: #edf4fb; border: 1px solid #d0e2f4;
+            border-radius: 7px; }
+        QProgressBar { border: 1px solid #d0deec; border-radius: 6px;
+            background: #e8edf4; text-align: center; color: #172638; }
+        QProgressBar::chunk { background: #69a5da; border-radius: 5px; }
         QCheckBox { spacing: 5px; }
     """)
     from .help_tooltips import install_help
