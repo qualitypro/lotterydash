@@ -122,6 +122,10 @@ class PanelEditor(QWidget):
         reset.setToolTip("Clear panel " + letter)
         reset.clicked.connect(self.reset)
         row.addWidget(reset)
+        self.status = QLabel("VOID")
+        self.status.setFixedWidth(64)
+        self.status.setToolTip("VOID means this panel is unchecked and will not be saved or printed.")
+        row.addWidget(self.status)
         self.digits.textChanged.connect(self._digits_changed)
         self.enabled.toggled.connect(self._panel_toggled)
         for signal in (
@@ -151,12 +155,25 @@ class PanelEditor(QWidget):
         for widget in (self.digits, self.play_type, self.amount, self.draw, self.fireball):
             widget.setEnabled(active)
         if notify:
+            self._refresh_status()
+        if notify:
             self.changed()
+
+    def _refresh_status(self):
+        if not self.enabled.isChecked():
+            label, tip = "VOID", "Unchecked: omitted from saved plays and proofs."
+        elif len(self.digits.text()) != 3:
+            label, tip = "INCOMPLETE", "Active panel: enter exactly three digits."
+        else:
+            label, tip = "READY", "Active panel: three digits entered; final validation occurs when saving or exporting."
+        self.status.setText(label)
+        self.status.setToolTip(tip)
 
     def _update_play_help(self, *_):
         self.play_type.setToolTip(PLAY_HELP.get(self.play_type.currentData(), "Select the play type."))
 
     def _digits_changed(self, text):
+        self._refresh_status()
         self.changed()
 
     def reset(self):
@@ -170,6 +187,7 @@ class PanelEditor(QWidget):
         self.amount.setCurrentIndex(self.amount.findData(str(play.amount)))
         self.draw.setCurrentIndex(self.draw.findData(play.draw.value))
         self.fireball.setChecked(play.fireball)
+        self._refresh_status()
 
     def get_play(self):
         if not self.enabled.isChecked():
@@ -218,7 +236,7 @@ class FivePanelEditor(QWidget):
         for title, width, stretch in (
             ("Panel", 47, 0), ("Numbers", 86, 0), ("Play type", 150, 2),
             ("Wager", 88, 0), ("Draw", 110, 0), ("Fireball", 56, 0),
-            ("", 64, 0),
+            ("", 64, 0), ("Status", 64, 0),
         ):
             label = QLabel(title)
             label.setObjectName("columnHeader")
@@ -237,9 +255,9 @@ class FivePanelEditor(QWidget):
         self.progress = QProgressBar()
         self.progress.setRange(0, 5)
         self.progress.setTextVisible(True)
-        self.progress.setFormat("%v / 5 panels configured")
+        self.progress.setFormat("%v / 5 panels ready")
         self.progress.setMaximumHeight(16)
-        self.progress.setToolTip("Number of enabled panels. This is not a guarantee that every entry is valid.")
+        self.progress.setToolTip("Number of checked panels with three digits. Final validation occurs when saving or exporting.")
         layout.addWidget(self.progress)
         self.guide = QFrame()
         self.guide.setObjectName("visualGuide")
@@ -292,9 +310,10 @@ class FivePanelEditor(QWidget):
 
     def _changed(self, *_):
         used = sum(p.enabled.isChecked() for p in self.panels)
-        self.summary.setText(f"{used} of 5 panels")
+        ready = sum(p.enabled.isChecked() and len(p.digits.text()) == 3 for p in self.panels)
+        self.summary.setText(f"{ready} ready · {used - ready} incomplete · {5 - used} void")
         if hasattr(self, "progress"):
-            self.progress.setValue(used)
+            self.progress.setValue(ready)
         if self.on_change:
             self.on_change()
 
