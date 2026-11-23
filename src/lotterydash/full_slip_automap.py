@@ -54,11 +54,13 @@ def discover_panels(fields, candidates, width, height, tolerance=6, expected=5):
     # A repeated panel is normally above A in the supplied scan. Discover
     # its pitch from candidate y offsets, while restricting horizontal drift.
     votes = {}
+    field_y_values = [p.y * height for p in fields.values()]
+    minimum_panel_shift = max(40, max(field_y_values) - min(field_y_values) + 20)
     for point in fields.values():
         px, py = point.x * width, point.y * height
         for candidate in candidates:
             dx, dy = candidate.x - px, candidate.y - py
-            if abs(dx) <= 10 and -height * .65 <= dy <= -40:
+            if abs(dx) <= 10 and -height * .65 <= dy <= -minimum_panel_shift:
                 bin_y = round(dy / 3) * 3
                 votes[bin_y] = votes.get(bin_y, 0) + 1
 
