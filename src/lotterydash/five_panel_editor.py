@@ -23,11 +23,12 @@ class PanelEditor(QWidget):
         row.setContentsMargins(7, 5, 7, 5)
         row.setSpacing(8)
         self.enabled = QCheckBox(letter)
-        self.enabled.setToolTip("Include panel " + letter)
+        self.enabled.setToolTip("Include panel " + letter + " in the saved playslip and PDF proof.")
         self.enabled.setFixedWidth(47)
         row.addWidget(self.enabled)
         self.digits = QLineEdit()
         self.digits.setPlaceholderText("000")
+        self.digits.setToolTip("Enter exactly three digits (000–999). Leading zeros are valid.")
         self.digits.setMaxLength(3)
         self.digits.setValidator(QRegularExpressionValidator(QRegularExpression("[0-9]{0,3}")))
         self.digits.setFixedWidth(86)
@@ -36,21 +37,25 @@ class PanelEditor(QWidget):
         self.play_type = QComboBox()
         for value in PlayType:
             self.play_type.addItem(value.value.replace("_", " ").title(), value.value)
+        self.play_type.setToolTip("Choose how this panel is played, such as Straight or Box. Each type has different winning conditions.")
         self.play_type.setMinimumWidth(150)
         row.addWidget(self.play_type, 2)
         self.amount = QComboBox()
         for amount in ("1.00", "0.50"):
             self.amount.addItem("$" + amount, amount)
+        self.amount.setToolTip("Choose the wager amount for this panel. This is the base wager, not a calculated total.")
         self.amount.setFixedWidth(88)
         row.addWidget(self.amount)
         self.draw = QComboBox()
         for value in Draw:
             self.draw.addItem(value.value.title(), value.value)
+        self.draw.setToolTip("Select the draw associated with this panel, such as Midday or Evening.")
         self.draw.setFixedWidth(110)
         self.draw.setCurrentIndex(1)
         row.addWidget(self.draw)
         self.fireball = QCheckBox()
-        self.fireball.setToolTip("Add Fireball to this panel")
+        self.fireball.setToolTip("Fireball (FB): optional Pick 3 add-on using a separately drawn Fireball number. It changes the wager and prize possibilities; verify official rules before playing.")
+        self.fireball.setFixedWidth(56)
         row.addWidget(self.fireball, alignment=Qt.AlignmentFlag.AlignCenter)
         reset = QPushButton("Clear")
         reset.setObjectName("subtleButton")
@@ -124,13 +129,22 @@ class FivePanelEditor(QWidget):
         labels = QHBoxLayout(headers)
         labels.setContentsMargins(7, 0, 7, 5)
         labels.setSpacing(8)
+        explanations = {
+            "Panel": "Panels A–E correspond to the five play positions on the physical playslip. Check a letter to include it.",
+            "Numbers": "Three digits for the selected panel, including leading zeros such as 007.",
+            "Play type": "How the numbers are played; the choice affects the winning conditions.",
+            "Wager": "Base wager selected for this individual panel.",
+            "Draw": "Which draw this panel applies to.",
+            "Fireball": "Optional Fireball add-on. Hover over each checkbox for details.",
+        }
         for title, width, stretch in (
             ("Panel", 47, 0), ("Numbers", 86, 0), ("Play type", 150, 2),
-            ("Wager", 88, 0), ("Draw", 110, 0), ("FB", 22, 0),
+            ("Wager", 88, 0), ("Draw", 110, 0), ("Fireball", 56, 0),
             ("", 64, 0),
         ):
             label = QLabel(title)
             label.setObjectName("columnHeader")
+            label.setToolTip(explanations.get(title, "Panel action"))
             if width:
                 label.setMinimumWidth(width)
                 if stretch == 0:
