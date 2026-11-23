@@ -329,6 +329,9 @@ class MainWindow(LegacyMainWindow):
         self.setCentralWidget(container)
         from .context_inspector import install_context_inspector
         install_context_inspector(self)
+        self.context_help_menu_action.setChecked(self.context_inspector.isVisible())
+        self.context_inspector.visibilityChanged.connect(
+            self.context_help_menu_action.setChecked)
         self._game_changed()
         self._update_toolbar_context()
 
