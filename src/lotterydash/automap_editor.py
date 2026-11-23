@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .calibration import ScanPoint, load_mapping, save_mapping
 from .global_options import GLOBAL_FIELDS, validate_global_fields
+from .draft_recovery import find_latest_draft
 
 
 def safe_destination(source: Path, destination: Path):
@@ -35,6 +36,8 @@ def main(argv=None):
     parser.add_argument("--image", type=Path, required=True)
     parser.add_argument("--mapping", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, default=Path("images/diagnostics/automap-editor"))
+    parser.add_argument("--resume-latest", action="store_true",
+                        help="Offer to reopen the latest complete 231-field draft")
     args = parser.parse_args(argv)
     from PySide6.QtCore import Qt, QPointF, QRectF
     from PySide6.QtGui import QColor, QBrush, QPen, QPixmap, QPainter, QUndoCommand, QUndoStack
@@ -113,6 +116,16 @@ def main(argv=None):
             super().__init__()
             self.setWindowTitle("LotteryDash — AutoMap Editor (review only)")
             self.source = args.mapping
+            if args.resume_latest:
+                latest = find_latest_draft(Path("images/diagnostics"))
+                if latest is not None and latest.resolve() != self.source.resolve():
+                    choice = QMessageBox.question(
+                        self, "Resume saved AutoMap draft",
+                        f"Resume the latest complete 231-field draft?\\n{latest}",
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                        QMessageBox.StandardButton.Yes)
+                    if choice == QMessageBox.StandardButton.Yes:
+                        self.source = latest
             self.points, self.source_data = load_review_data(self.source)
             self.image = QPixmap(str(args.image))
             if self.image.isNull():
@@ -121,6 +134,7 @@ def main(argv=None):
             self.original = {k: QPointF(v.x * self.width_px, v.y * self.height_px)
                              for k, v in self.points.items()}
             self.markers = {}
+            self.saved_snapshot = None
             self.active = None
             self.placement_field = None
             self.stack = QUndoStack(self)
@@ -151,6 +165,7 @@ def main(argv=None):
                 self.markers[name] = marker
             self.panel.setCurrentText("All")
             self.filter_panel("All")
+            self.saved_snapshot = self.snapshot()
 
             side = QWidget()
             controls = QVBoxLayout(side)
@@ -216,6 +231,22 @@ def main(argv=None):
             self.resize(1200, 850)
             self.fit_slip()
             self.statusBar().showMessage(f"{len(self.markers)} fields loaded — review required")
+
+        def snapshot(self):
+            return {name: (marker.pos().x(), marker.pos().y())
+                    for name, marker in self.markers.items()}
+
+        def closeEvent(self, event):
+            if self.snapshot() != self.saved_snapshot:
+                answer = QMessageBox.question(
+                    self, "Unsaved AutoMap changes",
+                    "Marker changes have not been saved. Close without saving?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No)
+                if answer != QMessageBox.StandardButton.Yes:
+                    event.ignore()
+                    return
+            event.accept()
 
         def calculate_slip_bounds(self):
             """Derive a generous scan crop from known field centers, no image edits."""
@@ -392,6 +423,7 @@ def main(argv=None):
                     "field_count": len(output),
                     "review_method": "manual_editor",
                 }, indent=2) + "\n", encoding="utf-8")
+                self.saved_snapshot = self.snapshot()
                 QMessageBox.information(self, "Saved", str(target))
             except Exception as exc:
                 QMessageBox.critical(self, "Save failed", str(exc))
