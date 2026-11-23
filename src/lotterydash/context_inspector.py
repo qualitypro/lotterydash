@@ -28,7 +28,7 @@ class ContextInspector(QWidget):
         header.addStretch()
         clear = QPushButton("Reset")
         clear.setToolTip("Unpin and return to the general context help introduction.")
-        clear.clicked.connect(self.reset)
+        clear.clicked.connect(lambda checked=False: self.reset())
         header.addWidget(clear)
         layout.addLayout(header)
         self.path = QLabel("Workspace → Context Help")
