@@ -185,8 +185,9 @@ class MainWindow(LegacyMainWindow):
         outer = QVBoxLayout(container)
         outer.setContentsMargins(5, 3, 5, 3)
         outer.setSpacing(2)
-        from .app_title_bar import AppTitleBar
+        from .app_title_bar import AppTitleBar, WindowEdgeController
         self.app_title_bar = AppTitleBar(self)
+        self.window_edge_controller = WindowEdgeController(self)
         outer.addWidget(self.app_title_bar)
         from PySide6.QtWidgets import QFrame
         header = QFrame()
@@ -648,7 +649,7 @@ def main():
     app.setStyleSheet("""
         QMainWindow { background: #eef2f7; color: #17283d; }
         QWidget { color: #17283d; font-family: "Noto Sans", "DejaVu Sans", sans-serif; font-size: 12px; }
-        QWidget#appTitleBar { background: #101f32; border-radius: 5px; }\n        QLabel#appWindowTitle { color: #f3f7fd; font-weight: 700; font-size: 12px; }\n        QToolButton#windowControl, QToolButton#windowCloseButton { background: transparent; color: #e6eef9; border: none; font-size: 17px; }\n        QToolButton#windowControl:hover { background: #34506d; }\n        QToolButton#windowCloseButton:hover { background: #c43d48; color: white; }\n        QLabel#toolbarContext { color: #bcd5f2; font-size: 11px; }\n        QToolButton#headerAction { background: #2a4565; color: #f0f6ff; border: 1px solid #54718f; border-radius: 4px; padding: 3px 8px; }\n        QToolButton#headerAction:hover { background: #365b80; }\n        QFrame#workspaceHeader { background: #172d49; border: 1px solid #284565; border-radius: 6px; }
+        QWidget#appTitleBar { background: #101f32; border-radius: 5px; }\n        QLabel#windowDragHint { color: #a6bbd2; font-size: 10px; padding-left: 10px; }\n        QLabel#appWindowTitle { color: #f3f7fd; font-weight: 700; font-size: 12px; }\n        QToolButton#windowControl, QToolButton#windowCloseButton { background: #2c4563; color: #ffffff; border: 1px solid #68819e; border-radius: 5px; font-size: 18px; font-weight: 700; }\n        QToolButton#windowControl:hover { background: #34506d; }\n        QToolButton#windowCloseButton { background: #a83240; border-color: #d66a74; }\n        QToolButton#windowCloseButton:hover { background: #dc4653; color: white; }\n        QLabel#toolbarContext { color: #bcd5f2; font-size: 11px; }\n        QToolButton#headerAction { background: #2a4565; color: #f0f6ff; border: 1px solid #54718f; border-radius: 4px; padding: 3px 8px; }\n        QToolButton#headerAction:hover { background: #365b80; }\n        QFrame#workspaceHeader { background: #172d49; border: 1px solid #284565; border-radius: 6px; }
         QFrame#workspaceHeader QLabel { color: #f4f8ff; }
         QLabel#brandEyebrow { color: #9bc8fa; font-size: 10px; font-weight: 700; }
         QLabel#projectTitle { color: #c8d8eb; font-size: 12px; }
