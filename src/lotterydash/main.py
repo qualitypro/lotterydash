@@ -202,7 +202,10 @@ class MainWindow(LegacyMainWindow):
         outer.addLayout(bar)
         self.tabs = QTabWidget()
         outer.addWidget(self.tabs)
-        self.tabs.addTab(old_planner, "Play")
+        from .five_panel_editor import FivePanelEditor
+        self.panel_editor = FivePanelEditor()
+        self.tabs.addTab(self.panel_editor, "Play")
+        old_planner.deleteLater()
         self.project_status = QLabel("Create or open a project to begin.")
         for title, description in (
             ("Playslip", "Preview current play selections against this project's scanned slip."),
@@ -312,13 +315,10 @@ class MainWindow(LegacyMainWindow):
         self.tabs.setCurrentIndex(0 if project["game"] == "pick3" else 1)
         self.statusBar().showMessage(f"Project created and saved: {target}")
 
-    def _serialize_plays(self):
-        return [
-            {"digits": p.digits, "play_type": p.play_type.value,
-             "amount": str(p.amount), "draw": p.draw.value,
-             "fireball": p.fireball}
-            for p in self.plays
-        ]
+    def _sync_panel_plays(self):
+        if self.game_selector.currentData() != "pick3":
+            return
+        self.plays = self.panel_editor.collect_plays()
 
     def _restore_plays(self, data):
         from decimal import Decimal
@@ -328,12 +328,45 @@ class MainWindow(LegacyMainWindow):
                       fireball=p.get("fireball", False))
             for p in data
         ]
-        if len(restored) > 5:
-            raise ValueError("Pick 3 supports at most five plays")
+        self.panel_editor.set_plays(restored)
         self.plays = restored
-        self.summary.setText(
-            f"{len(restored)} / 5 panels: " +
-            ", ".join(p.digits for p in restored))
+
+    def clear(self):
+        if hasattr(self, "panel_editor"):
+            self.panel_editor.clear_all()
+        self.plays = []
+
+    def export(self):
+        try:
+            self._sync_panel_plays()
+        except ValueError as exc:
+            QMessageBox.warning(self, "Invalid panel", str(exc))
+            return
+        super().export()
+
+    def export_mapped(self):
+        try:
+            self._sync_panel_plays()
+        except ValueError as exc:
+            QMessageBox.warning(self, "Invalid panel", str(exc))
+            return
+        super().export_mapped()
+
+    def preview_mapped_plays(self):
+        try:
+            self._sync_panel_plays()
+        except ValueError as exc:
+            QMessageBox.warning(self, "Invalid panel", str(exc))
+            return
+        super().preview_mapped_plays()
+
+    def _serialize_plays(self):
+        return [
+            {"digits": p.digits, "play_type": p.play_type.value,
+             "amount": str(p.amount), "draw": p.draw.value,
+             "fireball": p.fireball}
+            for p in self.plays
+        ]
 
     def open_project_dialog(self):
         from PySide6.QtWidgets import QFileDialog
@@ -393,6 +426,11 @@ class MainWindow(LegacyMainWindow):
             if not filename:
                 return
             target = Path(filename)
+        try:
+            self._sync_panel_plays()
+        except ValueError as exc:
+            QMessageBox.warning(self, "Invalid panel", str(exc))
+            return
         payload = dict(self.project)
         payload["plays"] = self._serialize_plays() if payload["game"] == "pick3" else []
         try:
