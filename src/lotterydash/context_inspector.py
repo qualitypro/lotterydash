@@ -111,7 +111,7 @@ class ContextTracker(QObject):
             value = target.text()
             tooltip = target.toolTip()
         elif isinstance(target, QTabBar):
-            index = target.tabAt(target.mapFromGlobal(QApplication.instance().activeWindow().cursor().pos())) if False else target.currentIndex()
+            index = target.currentIndex()
             title = target.tabText(index) if index >= 0 else "Workspace tab"
             tooltip = target.tabToolTip(index) if index >= 0 else ""
         else:
