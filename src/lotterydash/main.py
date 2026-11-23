@@ -337,9 +337,7 @@ class MainWindow(LegacyMainWindow):
         install_context_inspector(self)
         self.project_context_container.setVisible(self.context_inspector.isVisible())
         self.context_help_menu_action.setChecked(self.context_inspector.isVisible())
-        self.context_inspector.visibilityChanged.connect(
-            self.context_help_menu_action.setChecked)
-        self.context_inspector.visibilityChanged.connect(
+        self.context_help_menu_action.triggered.connect(
             self.project_context_container.setVisible)
         self._game_changed()
         self._update_toolbar_context()
