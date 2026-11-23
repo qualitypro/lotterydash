@@ -252,6 +252,8 @@ class MainWindow(LegacyMainWindow):
         self.tabs.setTabToolTip(
             guide_index, "Search the meanings of game terms, playslip controls, mapping, projects and printing.")
         self.setCentralWidget(container)
+        from .context_inspector import install_context_inspector
+        install_context_inspector(self)
         self._game_changed()
 
     def _game_changed(self, *_):
